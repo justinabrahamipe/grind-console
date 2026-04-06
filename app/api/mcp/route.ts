@@ -14,10 +14,16 @@ const SERVER_INFO = {
 // Track active sessions: sessionId -> userId
 const sessions = new Map<string, string>();
 
+const READ_ANNOTATION = { readOnlyHint: true, destructiveHint: false, idempotentHint: true };
+const WRITE_ANNOTATION = { readOnlyHint: false, destructiveHint: false, idempotentHint: false };
+const DESTRUCTIVE_ANNOTATION = { readOnlyHint: false, destructiveHint: true, idempotentHint: false };
+
 const TOOLS = [
+  // --- Read-only tools ---
   {
     name: "get_tasks",
     description: "Get tasks for a date range. Returns task name, completion status, value, target, and date.",
+    annotations: READ_ANNOTATION,
     inputSchema: {
       type: "object",
       properties: {
@@ -29,11 +35,13 @@ const TOOLS = [
   {
     name: "get_goals",
     description: "Get all goals with their progress, type (habitual/target/outcome), status, and linked pillar.",
+    annotations: READ_ANNOTATION,
     inputSchema: { type: "object", properties: {} },
   },
   {
     name: "get_scores",
     description: "Get daily action scores and momentum for a date range.",
+    annotations: READ_ANNOTATION,
     inputSchema: {
       type: "object",
       properties: {
@@ -45,6 +53,7 @@ const TOOLS = [
   {
     name: "get_logs",
     description: "Get log entries (user notes, auto-logged task completions, goal changes, etc.) for a date range.",
+    annotations: READ_ANNOTATION,
     inputSchema: {
       type: "object",
       properties: {
@@ -56,16 +65,49 @@ const TOOLS = [
   {
     name: "get_pillars",
     description: "Get life pillars (categories) with their default base points and descriptions.",
+    annotations: READ_ANNOTATION,
     inputSchema: { type: "object", properties: {} },
   },
   {
     name: "get_summary",
     description: "Get a comprehensive summary of today's tasks, active goals, recent scores, and recent logs.",
+    annotations: READ_ANNOTATION,
     inputSchema: { type: "object", properties: {} },
   },
   {
+    name: "get_task_details",
+    description: "Get full details of a specific task including schedule info, goal link, points, and completion state.",
+    annotations: READ_ANNOTATION,
+    inputSchema: {
+      type: "object",
+      properties: {
+        taskId: { type: "number", description: "The task instance ID." },
+      },
+      required: ["taskId"],
+    },
+  },
+  {
+    name: "get_cycles",
+    description: "Get all cycles/periods with their dates, vision, and theme.",
+    annotations: READ_ANNOTATION,
+    inputSchema: { type: "object", properties: {} },
+  },
+  {
+    name: "get_feedback",
+    description: "Get feedback/contact messages submitted by the user.",
+    annotations: READ_ANNOTATION,
+    inputSchema: {
+      type: "object",
+      properties: {
+        status: { type: "string", description: "Filter by status: todo, in_progress, done. Returns all if omitted." },
+      },
+    },
+  },
+  // --- Write tools ---
+  {
     name: "complete_task",
     description: "Mark a task as complete or update its value. Use get_tasks first to find the task ID.",
+    annotations: WRITE_ANNOTATION,
     inputSchema: {
       type: "object",
       properties: {
@@ -79,6 +121,7 @@ const TOOLS = [
   {
     name: "add_log",
     description: "Add a log entry (note/journal) for a given date.",
+    annotations: WRITE_ANNOTATION,
     inputSchema: {
       type: "object",
       properties: {
@@ -94,6 +137,7 @@ const TOOLS = [
   {
     name: "create_task",
     description: "Create a new task. Can be adhoc (one-time) or recurring (daily/weekly/custom).",
+    annotations: WRITE_ANNOTATION,
     inputSchema: {
       type: "object",
       properties: {
@@ -116,19 +160,9 @@ const TOOLS = [
     },
   },
   {
-    name: "get_task_details",
-    description: "Get full details of a specific task including schedule info, goal link, points, and completion state.",
-    inputSchema: {
-      type: "object",
-      properties: {
-        taskId: { type: "number", description: "The task instance ID." },
-      },
-      required: ["taskId"],
-    },
-  },
-  {
     name: "edit_task",
     description: "Edit an existing task's properties. Use get_tasks first to find the task ID.",
+    annotations: WRITE_ANNOTATION,
     inputSchema: {
       type: "object",
       properties: {
@@ -152,6 +186,7 @@ const TOOLS = [
   {
     name: "create_goal",
     description: "Create a new goal. Types: outcome (track a measurable result), target (accumulate toward a number), habitual (build a daily habit).",
+    annotations: WRITE_ANNOTATION,
     inputSchema: {
       type: "object",
       properties: {
@@ -177,6 +212,7 @@ const TOOLS = [
   {
     name: "edit_goal",
     description: "Edit an existing goal's properties. Use get_goals first to find the goal ID.",
+    annotations: WRITE_ANNOTATION,
     inputSchema: {
       type: "object",
       properties: {
@@ -202,19 +238,9 @@ const TOOLS = [
     },
   },
   {
-    name: "delete_task",
-    description: "Delete a task. Goal-linked tasks are dismissed instead of deleted to prevent auto-recreation. Use get_tasks first to find the task ID.",
-    inputSchema: {
-      type: "object",
-      properties: {
-        taskId: { type: "number", description: "The task ID to delete." },
-      },
-      required: ["taskId"],
-    },
-  },
-  {
     name: "create_cycle",
     description: "Create a new cycle/period (e.g. monthly sprint). Goals can be linked to cycles via periodId.",
+    annotations: WRITE_ANNOTATION,
     inputSchema: {
       type: "object",
       properties: {
@@ -230,6 +256,7 @@ const TOOLS = [
   {
     name: "create_pillar",
     description: "Create a new life pillar (category for grouping tasks and goals).",
+    annotations: WRITE_ANNOTATION,
     inputSchema: {
       type: "object",
       properties: {
@@ -245,6 +272,7 @@ const TOOLS = [
   {
     name: "edit_pillar",
     description: "Edit an existing pillar. Use get_pillars to find the ID.",
+    annotations: WRITE_ANNOTATION,
     inputSchema: {
       type: "object",
       properties: {
@@ -261,6 +289,7 @@ const TOOLS = [
   {
     name: "edit_cycle",
     description: "Edit an existing cycle/period. Use get_cycles to find the ID.",
+    annotations: WRITE_ANNOTATION,
     inputSchema: {
       type: "object",
       properties: {
@@ -274,19 +303,17 @@ const TOOLS = [
       required: ["cycleId"],
     },
   },
+  // --- Destructive tools ---
   {
-    name: "get_cycles",
-    description: "Get all cycles/periods with their dates, vision, and theme.",
-    inputSchema: { type: "object", properties: {} },
-  },
-  {
-    name: "get_feedback",
-    description: "Get feedback/contact messages submitted by the user.",
+    name: "delete_task",
+    description: "Delete a task. Goal-linked tasks are dismissed instead of deleted to prevent auto-recreation. Use get_tasks first to find the task ID.",
+    annotations: DESTRUCTIVE_ANNOTATION,
     inputSchema: {
       type: "object",
       properties: {
-        status: { type: "string", description: "Filter by status: todo, in_progress, done. Returns all if omitted." },
+        taskId: { type: "number", description: "The task ID to delete." },
       },
+      required: ["taskId"],
     },
   },
 ];
