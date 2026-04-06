@@ -731,6 +731,7 @@ export default function TaskDetailPage() {
             <FaTimes className="text-[10px]" /> {isSkipped ? "Unskip" : "Skip"}
           </button>
 
+          {taskDate && (
           <button
             onClick={handleHighlightToggle}
             className={`px-3 py-2 text-xs rounded-lg flex items-center gap-1.5 font-medium ${
@@ -742,6 +743,7 @@ export default function TaskDetailPage() {
             {isHighlighted ? <FaStar className="text-[10px]" /> : <FaRegStar className="text-[10px]" />}
             {isHighlighted ? "Unstar" : "Star"}
           </button>
+          )}
 
           <button
             onClick={() => setConfirmDelete(true)}
