@@ -201,8 +201,8 @@ export async function handleDeleteTask(args: any, userId: string): Promise<strin
   const [task] = await db.select().from(tasks).where(and(eq(tasks.id, taskId), eq(tasks.userId, userId)));
   if (!task) return "Error: Task not found.";
 
-  if (task.goalId) {
-    // Goal-linked: dismiss instead of delete to prevent auto-recreation
+  if (task.goalId || task.scheduleId) {
+    // Goal-linked or schedule-linked: dismiss instead of delete to prevent auto-recreation
     await db.update(tasks).set({ dismissed: true, completed: false, value: null, pointsEarned: 0 }).where(eq(tasks.id, taskId));
   } else {
     await db.delete(tasks).where(and(eq(tasks.id, taskId), eq(tasks.userId, userId)));
@@ -223,5 +223,5 @@ export async function handleDeleteTask(args: any, userId: string): Promise<strin
   if (task.date) await saveDailyScore(userId, task.date);
 
   await createAutoLog(userId, `🗑️ Task deleted: ${task.name}`);
-  return `Task "${task.name}" ${task.goalId ? "dismissed" : "deleted"}.`;
+  return `Task "${task.name}" ${(task.goalId || task.scheduleId) ? "dismissed" : "deleted"}.`;
 }

@@ -93,6 +93,7 @@ export async function handleEditGoal(args: any, userId: string): Promise<string>
   if (args.autoCreateTasks !== undefined) updateData.autoCreateTasks = args.autoCreateTasks;
   if (args.flexibilityRule !== undefined) updateData.flexibilityRule = args.flexibilityRule;
   if (args.limitValue !== undefined) updateData.limitValue = args.limitValue ?? null;
+  if (args.basePoints !== undefined) updateData.basePoints = args.basePoints ?? 10;
 
   if (Object.keys(updateData).length === 0) return "Error: No fields to update.";
 
@@ -128,25 +129,32 @@ export async function handleEditGoal(args: any, userId: string): Promise<string>
   // Generate new tasks for extended range, new days, or toggled-on autoCreateTasks
   await regenerateGoalTasksIfNeeded(goalId, userId, existing, args, null);
 
-  // Propagate name/pillar/completionType changes to linked tasks
-  const propagate: Record<string, unknown> = {};
-  if (args.name !== undefined) propagate.name = args.name;
-  if (args.pillarId !== undefined) propagate.pillarId = args.pillarId || null;
-  if (args.completionType !== undefined) propagate.completionType = args.completionType;
-  if (args.unit !== undefined) propagate.unit = args.unit || null;
+  // Propagate changes to linked uncompleted tasks and their schedules
+  const propagateToTasks: Record<string, unknown> = {};
+  const propagateToSchedules: Record<string, unknown> = {};
+  if (args.name !== undefined) { propagateToTasks.name = args.name; propagateToSchedules.name = args.name; }
+  if (args.pillarId !== undefined) { propagateToTasks.pillarId = args.pillarId || null; propagateToSchedules.pillarId = args.pillarId || null; }
+  if (args.completionType !== undefined) { propagateToTasks.completionType = args.completionType; propagateToSchedules.completionType = args.completionType; }
+  if (args.unit !== undefined) { propagateToTasks.unit = args.unit || null; propagateToSchedules.unit = args.unit || null; }
+  if (args.flexibilityRule !== undefined) { propagateToTasks.flexibilityRule = args.flexibilityRule; propagateToSchedules.flexibilityRule = args.flexibilityRule; }
+  if (args.limitValue !== undefined) { propagateToTasks.limitValue = args.limitValue ?? null; propagateToSchedules.limitValue = args.limitValue ?? null; }
+  if (args.dailyTarget !== undefined) { propagateToTasks.target = args.dailyTarget; propagateToSchedules.target = args.dailyTarget; }
+  if (args.basePoints !== undefined) { propagateToTasks.basePoints = args.basePoints ?? 10; propagateToSchedules.basePoints = args.basePoints ?? 10; }
+  if (args.periodId !== undefined) { propagateToTasks.periodId = args.periodId || null; propagateToSchedules.periodId = args.periodId || null; }
 
-  if (Object.keys(propagate).length > 0) {
+  if (Object.keys(propagateToTasks).length > 0) {
     const todayStr = getTodayString();
     const linkedTasks = await db.select().from(tasks)
       .where(and(eq(tasks.goalId, goalId), eq(tasks.userId, userId), eq(tasks.completed, false)));
     for (const t of linkedTasks) {
       if (t.date >= todayStr) {
-        await db.update(tasks).set(propagate).where(eq(tasks.id, t.id));
+        await db.update(tasks).set(propagateToTasks).where(eq(tasks.id, t.id));
       }
     }
-    // Also propagate to schedules
-    const scheduleProp: Record<string, unknown> = { ...propagate };
-    await db.update(taskSchedules).set(scheduleProp)
+  }
+
+  if (Object.keys(propagateToSchedules).length > 0) {
+    await db.update(taskSchedules).set(propagateToSchedules)
       .where(and(eq(taskSchedules.goalId, goalId), eq(taskSchedules.userId, userId)));
   }
 

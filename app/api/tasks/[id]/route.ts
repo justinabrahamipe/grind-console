@@ -235,8 +235,8 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
 
     await createAutoLog(userId, `🗑️ Task deleted: ${taskInstance.name}`);
 
-    // For goal-linked tasks, mark as dismissed instead of deleting (prevents auto-recreation)
-    if (taskInstance.goalId) {
+    // For goal-linked or schedule-linked tasks, mark as dismissed instead of deleting (prevents auto-recreation)
+    if (taskInstance.goalId || taskInstance.scheduleId) {
       await db
         .update(tasks)
         .set({ dismissed: true, completed: false, value: null, pointsEarned: 0 })
