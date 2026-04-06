@@ -71,7 +71,8 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
     // When scheduleDays changed, delete uncompleted future tasks on removed days
     if (body.scheduleDays !== undefined) {
       const newDays: number[] = body.scheduleDays || [];
-      const oldDays: number[] = existing[0].scheduleDays ? JSON.parse(existing[0].scheduleDays) : [];
+      const rawOld = existing[0].scheduleDays ? JSON.parse(existing[0].scheduleDays) : [];
+      const oldDays: number[] = Array.isArray(rawOld) ? rawOld : [];
       await deleteTasksOnRemovedDays(outcomeId, userId, oldDays, newDays);
     }
 
