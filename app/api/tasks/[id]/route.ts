@@ -98,6 +98,11 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
         if (body[field] !== undefined) updateData[field] = body[field];
       }
 
+      // Clear highlight when date is removed
+      if (body.date === '' || body.date === null) {
+        updateData.isHighlighted = false;
+      }
+
       const [updated] = await db
         .update(tasks)
         .set(updateData)

@@ -53,6 +53,15 @@ async function _ensureUpcomingTasksInner(userId: string, todayStr: string) {
       sql`${tasks.date} != '' AND ${tasks.date} < ${todayStr}`,
     ));
 
+  // Clear highlights on no-date tasks (starring is a daily feature)
+  await db.update(tasks)
+    .set({ isHighlighted: false })
+    .where(and(
+      eq(tasks.userId, userId),
+      eq(tasks.isHighlighted, true),
+      sql`${tasks.date} = '' OR ${tasks.date} IS NULL`,
+    ));
+
   // Get all active schedules for this user
   const allSchedules = await db
     .select()
