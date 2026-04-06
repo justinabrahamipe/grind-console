@@ -5,7 +5,7 @@ import { invalidateTaskCache } from "@/lib/ensure-upcoming-tasks";
 import { eq, and, or, gt } from "drizzle-orm";
 import { createAutoLog } from "@/lib/auto-log";
 import { saveDailyScore } from "@/lib/save-daily-score";
-import { getYesterdayString, getTodayString } from "@/lib/format";
+import { getTodayString } from "@/lib/format";
 
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -84,7 +84,11 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
       }
 
       // Only allow edits for today, yesterday, and future — older tasks are frozen (no-date tasks are always editable)
-      if (existing.date !== '' && existing.date < getYesterdayString()) {
+      // Use client-provided date to derive yesterday (avoids server timezone mismatch)
+      const refDate = body.date || body.startDate || existing.date;
+      const clientYesterday = new Date((refDate || existing.date) + 'T12:00:00');
+      clientYesterday.setDate(clientYesterday.getDate() - 1);
+      if (existing.date !== '' && existing.date < clientYesterday.toISOString().split('T')[0]) {
         return NextResponse.json({ error: "Cannot modify tasks older than yesterday" }, { status: 403 });
       }
 

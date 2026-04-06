@@ -29,8 +29,7 @@ export async function handleCompleteTask(args: any, userId: string): Promise<str
   if (!task) return "Error: Task not found.";
 
   // Only allow changes for today, yesterday, and future
-  const yesterdayStr = getYesterdayString();
-  if (task.date < yesterdayStr) {
+  if (task.date < getYesterdayString()) {
     return "Error: Cannot modify tasks older than yesterday.";
   }
 
