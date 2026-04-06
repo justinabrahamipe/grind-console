@@ -95,7 +95,7 @@ export async function handleCreateTask(args: any, userId: string): Promise<strin
       limitValue: args.limitValue ?? null,
       frequency,
       customDays: parseCustomDaysInput(args.customDays),
-      repeatInterval: null,
+      repeatInterval: args.repeatInterval ? parseInt(args.repeatInterval) : null,
       basePoints,
       goalId,
       periodId: goalPeriodId,
