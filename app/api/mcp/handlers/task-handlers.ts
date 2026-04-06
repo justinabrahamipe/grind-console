@@ -67,9 +67,24 @@ export async function handleCreateTask(args: any, userId: string): Promise<strin
     if (!p) return "Error: Pillar not found.";
   }
 
+  // If linked to a goal, inherit dates and pillar from the goal
+  const goalId = args.goalId ? parseInt(args.goalId) : null;
+  let goalStartDate: string | null = null;
+  let goalEndDate: string | null = null;
+  let goalPillarId = pillarId;
+  let goalPeriodId = args.periodId ? parseInt(args.periodId) : null;
+  if (goalId) {
+    const [goal] = await db.select().from(goals).where(and(eq(goals.id, goalId), eq(goals.userId, userId)));
+    if (!goal) return "Error: Goal not found.";
+    goalStartDate = goal.startDate;
+    goalEndDate = goal.targetDate;
+    if (!goalPillarId) goalPillarId = goal.pillarId;
+    if (!goalPeriodId) goalPeriodId = goal.periodId;
+  }
+
   if (isRecurring) {
     const [schedule] = await db.insert(taskSchedules).values({
-      pillarId,
+      pillarId: goalPillarId,
       userId,
       name: taskName,
       description: args.description || null,
@@ -82,9 +97,9 @@ export async function handleCreateTask(args: any, userId: string): Promise<strin
       customDays: parseCustomDaysInput(args.customDays),
       repeatInterval: null,
       basePoints,
-      goalId: args.goalId ? parseInt(args.goalId) : null,
-      periodId: args.periodId ? parseInt(args.periodId) : null,
-      startDate: null,
+      goalId,
+      periodId: goalPeriodId,
+      startDate: args.startDate || goalStartDate,
     }).returning();
 
     invalidateTaskCache(userId);
@@ -92,9 +107,9 @@ export async function handleCreateTask(args: any, userId: string): Promise<strin
     await createAutoLog(userId, `➕ Task created: ${taskName}`);
     return `Recurring task "${taskName}" created (${frequency}). Schedule ID: ${schedule.id}.`;
   } else {
-    const taskDate = args.date !== undefined ? args.date : '';
+    const taskDate = args.date !== undefined ? args.date : (goalStartDate || '');
     const [task] = await db.insert(tasks).values({
-      pillarId,
+      pillarId: goalPillarId,
       userId,
       name: taskName,
       description: args.description || null,
@@ -104,8 +119,8 @@ export async function handleCreateTask(args: any, userId: string): Promise<strin
       flexibilityRule: args.flexibilityRule || 'must_today',
       limitValue: args.limitValue ?? null,
       basePoints,
-      goalId: args.goalId ? parseInt(args.goalId) : null,
-      periodId: args.periodId ? parseInt(args.periodId) : null,
+      goalId,
+      periodId: goalPeriodId,
       date: taskDate,
     }).returning();
 

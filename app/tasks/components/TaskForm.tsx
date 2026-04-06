@@ -261,7 +261,16 @@ export default function TaskForm({
           </label>
           <select
             value={form.goalId}
-            onChange={(e) => setForm({ ...form, goalId: parseInt(e.target.value) || 0 })}
+            onChange={(e) => {
+              const goalId = parseInt(e.target.value) || 0;
+              const goal = goals.find(g => g.id === goalId);
+              setForm({
+                ...form,
+                goalId,
+                startDate: goal?.startDate || form.startDate,
+                pillarId: goal?.pillarId || form.pillarId,
+              });
+            }}
             disabled={goals.length === 0}
             className={`w-full px-3 py-2 border border-zinc-300 dark:border-zinc-600 rounded-lg bg-white dark:bg-zinc-700 text-zinc-900 dark:text-white ${goals.length === 0 ? 'opacity-50 cursor-not-allowed' : ''}`}
           >
@@ -339,7 +348,7 @@ export default function TaskForm({
         </div>
         <div>
           <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">
-            Task Date <span className="text-zinc-400 font-normal">(optional)</span>
+            {form.frequencyPreset !== 'adhoc' ? 'Start Date' : 'Task Date'} <span className="text-zinc-400 font-normal">(optional)</span>
           </label>
           <input
             type="date"
