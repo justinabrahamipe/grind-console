@@ -22,6 +22,15 @@ import { useTheme } from "@/components/ThemeProvider";
 import { formatDate, getTodayString, getYesterdayString } from "@/lib/format";
 import type { Task, Pillar, Outcome } from "@/lib/types";
 
+interface TaskDetail extends Task {
+  completed?: boolean;
+  value?: number | null;
+  skipped?: boolean;
+  isHighlighted?: boolean;
+  date?: string;
+  pointsEarned?: number;
+}
+
 export default function TaskDetailPage() {
   const { data: session, status } = useSession();
   const { habitualColor, targetColor, outcomeColor, dateFormat } = useTheme();
@@ -29,7 +38,7 @@ export default function TaskDetailPage() {
   const params = useParams();
   const id = params.id as string;
 
-  const [task, setTask] = useState<Task | null>(null);
+  const [task, setTask] = useState<TaskDetail | null>(null);
   const [pillar, setPillar] = useState<Pillar | null>(null);
   const [goal, setGoal] = useState<Outcome | null>(null);
   const [loading, setLoading] = useState(true);

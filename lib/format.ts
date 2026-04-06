@@ -11,6 +11,16 @@ export function getYesterdayString(): string {
   return d.toISOString().split('T')[0];
 }
 
+export function parseScheduleDays(raw: string | null | undefined): number[] {
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
 export function formatDate(dateStr: string, format: DateFormat = "DD/MM/YYYY"): string {
   const d = new Date(dateStr + (dateStr.includes("T") ? "" : "T12:00:00"));
   const day = String(d.getDate()).padStart(2, "0");

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { parseScheduleDays } from "@/lib/format";
 import { motion, AnimatePresence } from "framer-motion";
 import { FaTimes, FaCheck } from "react-icons/fa";
 import { calculateEffortMetrics } from "@/lib/effort-calculations";
@@ -17,7 +18,7 @@ export default function LogModal({
 }) {
   const getInitialValue = () => {
     if (logTarget.goalType === "target") {
-      const days = logTarget.scheduleDays ? JSON.parse(logTarget.scheduleDays) : [];
+      const days = parseScheduleDays(logTarget.scheduleDays);
       if (logTarget.startDate && logTarget.targetDate && days.length > 0) {
         const metrics = calculateEffortMetrics(
           logTarget.startDate, logTarget.targetDate, days,

@@ -16,7 +16,7 @@ import {
   FaArchive,
 } from "react-icons/fa";
 import { calculateEffortMetrics } from "@/lib/effort-calculations";
-import { formatDate } from "@/lib/format";
+import { formatDate, parseScheduleDays } from "@/lib/format";
 import { formatScheduleLabel } from "@/lib/constants";
 import { useTheme } from "@/components/ThemeProvider";
 import { Outcome, LogEntry, LinkedTask, Cycle } from "../types";
@@ -56,7 +56,7 @@ export default function GoalCard({
   const color = outcome.pillarColor || "#3B82F6";
   const isHabitual = outcome.goalType === "habitual";
   const isActivityGoal = outcome.goalType === "target" || outcome.goalType === "habitual";
-  const scheduleDays = useMemo(() => outcome.scheduleDays ? JSON.parse(outcome.scheduleDays) : [], [outcome.scheduleDays]);
+  const scheduleDays = useMemo(() => parseScheduleDays(outcome.scheduleDays), [outcome.scheduleDays]);
   const [showCyclePicker, setShowCyclePicker] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);

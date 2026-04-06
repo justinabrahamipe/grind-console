@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { parseScheduleDays } from "@/lib/format";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -69,7 +70,7 @@ export default function GoalsPage() {
           goalType: outcome.goalType,
           completionType: outcome.completionType,
           dailyTarget: outcome.dailyTarget,
-          scheduleDays: outcome.scheduleDays ? JSON.parse(outcome.scheduleDays) : null,
+          scheduleDays: parseScheduleDays(outcome.scheduleDays),
           autoCreateTasks: outcome.autoCreateTasks,
           startValue: outcome.startValue,
           startDate: cycle.startDate,

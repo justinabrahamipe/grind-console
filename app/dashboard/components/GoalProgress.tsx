@@ -1,6 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
+import { parseScheduleDays } from "@/lib/format";
 import { FaTrophy } from "react-icons/fa";
 import Link from "next/link";
 import { getProgressColor } from "@/lib/scoring";
@@ -17,7 +18,7 @@ export default function GoalProgress({ outcomesData, completionDates, today }: G
 
   // Pre-compute expected days for habitual goals so we can filter out 0/0
   const getExpectedDays = (o: OutcomeData) => {
-    const scheduleDays: number[] = o.scheduleDays ? JSON.parse(o.scheduleDays) : [];
+    const scheduleDays: number[] = parseScheduleDays(o.scheduleDays);
     const start = o.startDate || today;
     let expected = 0;
     const d = new Date(start + 'T00:00:00');

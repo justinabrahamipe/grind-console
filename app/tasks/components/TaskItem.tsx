@@ -7,7 +7,7 @@ import { formatScheduleLabel } from "@/lib/constants";
 import { getProgressColor } from "@/lib/scoring";
 import { countScheduledDaysInRange } from "@/lib/effort-calculations";
 import { useTheme } from "@/components/ThemeProvider";
-import { getTodayString, getYesterdayString } from "@/lib/format";
+import { getTodayString, getYesterdayString, parseScheduleDays } from "@/lib/format";
 import type { Task, Outcome, Cycle } from "@/lib/types";
 import { AppRouterInstance } from "next/dist/shared/lib/app-router-context.shared-runtime";
 
@@ -15,6 +15,7 @@ export interface EnrichedTask extends Task {
   _pillarColor: string;
   _pillarEmoji: string;
   _pillarName: string;
+  date?: string;
 }
 
 interface TaskItemProps {
@@ -223,8 +224,8 @@ export default function TaskItem({
   const showIncrement = isNonCheckbox && !isFullyDone && !isDiscarded && !isTimerRunning;
   const rightLabel = isDiscarded ? 'Unskip' : showIncrement ? `+${swipeIncrement}` : isFullyDone ? 'Undo' : 'Done';
   const leftLabel = isDiscarded ? 'Unskip' : (showIncrement && !isAtZero ? `-${swipeIncrement}` : (isFullyDone ? 'Undo' : 'Skip'));
-  const rightColor = isDiscarded ? 'amber' : showIncrement ? 'green' : (isFullyDone ? 'amber' : 'green');
-  const leftColor = isDiscarded ? 'amber' : (showIncrement && !isAtZero ? 'amber' : 'amber');
+  const rightColor: 'green' | 'amber' | 'red' = isDiscarded ? 'amber' : showIncrement ? 'green' : (isFullyDone ? 'amber' : 'green');
+  const leftColor = (isDiscarded ? 'amber' : (showIncrement && !isAtZero ? 'amber' : 'amber')) as 'green' | 'amber' | 'red';
 
   return (
     <div className="relative rounded-lg overflow-hidden">
@@ -363,7 +364,7 @@ export default function TaskItem({
               if (!goal || goal.goalType !== 'outcome' || !goal.startDate || !goal.targetDate) return null;
               const taskDate = task.startDate || getTodayString();
               if (taskDate < goal.startDate || taskDate > goal.targetDate) return null;
-              const sched: number[] = goal.scheduleDays ? JSON.parse(goal.scheduleDays) : [];
+              const sched: number[] = parseScheduleDays(goal.scheduleDays);
               const total = sched.length > 0
                 ? countScheduledDaysInRange(goal.startDate, goal.targetDate, sched)
                 : Math.max(1, Math.round((new Date(goal.targetDate).getTime() - new Date(goal.startDate).getTime()) / 86400000));
