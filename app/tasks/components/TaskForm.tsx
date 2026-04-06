@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { FaCheck, FaPlus, FaMinus } from "react-icons/fa";
 import { COMPLETION_TYPES, FREQUENCY_PRESETS, REPEAT_UNITS, DAY_NAMES } from "@/lib/constants";
+import { parseCustomDays } from "@/lib/format";
 import type { Pillar, Task, Goal, TaskFormState } from "@/lib/types";
 
 
@@ -13,7 +14,7 @@ function taskToPreset(task: Task): {
   customDays: number[];
   monthDay: number;
 } {
-  const customDays = task.customDays ? JSON.parse(task.customDays) : [];
+  const customDays = parseCustomDays(task.customDays);
 
   if (task.frequency === "adhoc")
     return { preset: "adhoc", repeatInterval: "1", repeatUnit: "days", customDays: [], monthDay: 1 };

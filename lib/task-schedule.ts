@@ -1,5 +1,5 @@
 import { taskSchedules } from '@/lib/db';
-import { getTodayString } from '@/lib/format';
+import { getTodayString, parseCustomDays } from '@/lib/format';
 
 /**
  * Determines if a schedule should generate a task for the given date.
@@ -25,7 +25,7 @@ function isScheduleForExactDate(schedule: typeof taskSchedules.$inferSelect, dat
 
   if (schedule.frequency === 'custom' && schedule.customDays) {
     try {
-      const days: number[] = JSON.parse(schedule.customDays);
+      const days: number[] = parseCustomDays(schedule.customDays);
       if (!days.includes(dayOfWeek)) return false;
       // Check week interval if set (every N weeks)
       if (schedule.repeatInterval && schedule.repeatInterval > 7) {
@@ -50,7 +50,7 @@ function isScheduleForExactDate(schedule: typeof taskSchedules.$inferSelect, dat
 
   if (schedule.frequency === 'monthly' && schedule.customDays) {
     try {
-      const days: number[] = JSON.parse(schedule.customDays);
+      const days: number[] = parseCustomDays(schedule.customDays);
       const dayOfMonth = date.getDate();
       if (!days.includes(dayOfMonth)) return false;
       if (schedule.repeatInterval && schedule.repeatInterval > 1) {

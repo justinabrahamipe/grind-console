@@ -5,7 +5,7 @@ import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { DEMO_TASK_GROUPS, DEMO_PILLARS } from "@/lib/demo-data";
 import { useTheme } from "@/components/ThemeProvider";
-import { formatDate, getTodayString, getYesterdayString } from "@/lib/format";
+import { formatDate, getTodayString, getYesterdayString, parseCustomDays } from "@/lib/format";
 import { formatScheduleLabel } from "@/lib/constants";
 import type { Pillar, Task, TaskGroup, Outcome, Cycle } from "@/lib/types";
 
@@ -73,7 +73,7 @@ function getDateBucket(task: { frequency: string; customDays?: string | null; cr
     const dow = d.getDay();
     if (task.frequency === 'custom' && task.customDays) {
       try {
-        const days: number[] = JSON.parse(task.customDays);
+        const days: number[] = parseCustomDays(task.customDays);
         matches = days.includes(dow);
         // Check week interval if set (every N weeks)
         if (matches && task.repeatInterval && task.repeatInterval > 7) {
@@ -93,7 +93,7 @@ function getDateBucket(task: { frequency: string; customDays?: string | null; cr
       } catch { matches = false; }
     } else if (task.frequency === 'monthly' && task.customDays) {
       try {
-        const days: number[] = JSON.parse(task.customDays);
+        const days: number[] = parseCustomDays(task.customDays);
         matches = days.includes(d.getDate());
       } catch { matches = false; }
     } else if (task.frequency === 'interval' && task.repeatInterval) {
@@ -126,7 +126,7 @@ export { getDateBucket };
 function taskToPreset(task: { frequency: string; customDays?: string | null; repeatInterval?: number | null }): {
   preset: string; repeatInterval: string; repeatUnit: 'days' | 'weeks' | 'months'; customDays: number[]; monthDay: number
 } {
-  const customDays = task.customDays ? JSON.parse(task.customDays) : [];
+  const customDays = task.customDays ? parseCustomDays(task.customDays) : [];
 
   if (task.frequency === 'adhoc') return { preset: 'adhoc', repeatInterval: '1', repeatUnit: 'days', customDays: [], monthDay: 1 };
   if (task.frequency === 'daily') return { preset: 'daily', repeatInterval: '1', repeatUnit: 'days', customDays: [], monthDay: 1 };
@@ -880,9 +880,9 @@ export function useTasksPage() {
             let matches = false;
             if (task.frequency === 'daily') matches = true;
             else if (task.frequency === 'custom' && task.customDays) {
-              try { matches = JSON.parse(task.customDays).includes(dow); } catch { /* ignore */ }
+              try { matches = parseCustomDays(task.customDays).includes(dow); } catch { /* ignore */ }
             } else if (task.frequency === 'monthly' && task.customDays) {
-              try { matches = JSON.parse(task.customDays).includes(d.getDate()); } catch { /* ignore */ }
+              try { matches = parseCustomDays(task.customDays).includes(d.getDate()); } catch { /* ignore */ }
             } else if (task.frequency === 'weekly') {
               matches = dow === 1;
             }
@@ -933,7 +933,7 @@ export function useTasksPage() {
     if (task.frequency === 'weekly') return 'Every Monday';
     if (task.frequency === 'custom' && task.customDays) {
       try {
-        const days: number[] = JSON.parse(task.customDays);
+        const days: number[] = parseCustomDays(task.customDays);
         const label = formatScheduleLabel(days);
         const interval = task.repeatInterval && task.repeatInterval > 7 ? Math.round(task.repeatInterval / 7) : 1;
         return interval > 1 ? `${label} (every ${interval} weeks)` : label;
@@ -941,7 +941,7 @@ export function useTasksPage() {
     }
     if (task.frequency === 'monthly' && task.customDays) {
       try {
-        const days: number[] = JSON.parse(task.customDays);
+        const days: number[] = parseCustomDays(task.customDays);
         const interval = task.repeatInterval && task.repeatInterval > 1 ? task.repeatInterval : 1;
         const dayStr = days.map(d => `${d}${d === 1 ? 'st' : d === 2 ? 'nd' : d === 3 ? 'rd' : 'th'}`).join(', ');
         return interval > 1 ? `${dayStr} of every ${interval} months` : `${dayStr} of every month`;
