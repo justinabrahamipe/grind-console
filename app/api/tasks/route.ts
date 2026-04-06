@@ -25,36 +25,30 @@ export async function GET(request: NextRequest) {
     }
 
     // Get pillars for grouping
-    const userPillars = await db
+    const userPillarsPromise = db
       .select()
       .from(pillars)
       .where(eq(pillars.userId, userId));
 
     if (showAll) {
-      // Return all task schedules (for week/month/scheduled views that need client-side bucketing)
-      const allSchedules = await db
-        .select()
-        .from(taskSchedules)
-        .where(eq(taskSchedules.userId, userId))
-        .orderBy(asc(taskSchedules.pillarId));
-
-      // For the all view, fetch today's completions to attach
       const todayStr = date || getTodayString();
-      const todayTasks = await db
-        .select()
-        .from(tasks)
-        .where(and(eq(tasks.userId, userId), eq(tasks.date, todayStr), eq(tasks.dismissed, false)));
+
+      // Run all queries in parallel
+      const [userPillars, allSchedules, todayTasks, adhocTasks] = await Promise.all([
+        userPillarsPromise,
+        db.select().from(taskSchedules)
+          .where(eq(taskSchedules.userId, userId))
+          .orderBy(asc(taskSchedules.pillarId)),
+        db.select().from(tasks)
+          .where(and(eq(tasks.userId, userId), eq(tasks.date, todayStr), eq(tasks.dismissed, false))),
+        db.select().from(tasks)
+          .where(and(eq(tasks.userId, userId), isNull(tasks.scheduleId), eq(tasks.dismissed, false)))
+          .orderBy(asc(tasks.pillarId)),
+      ]);
 
       const completionBySchedule = new Map(
         todayTasks.filter(t => t.scheduleId).map(t => [t.scheduleId!, t])
       );
-
-      // Also fetch adhoc tasks (no schedule) for inclusion in the all view
-      const adhocTasks = await db
-        .select()
-        .from(tasks)
-        .where(and(eq(tasks.userId, userId), isNull(tasks.scheduleId), eq(tasks.dismissed, false)))
-        .orderBy(asc(tasks.pillarId));
 
       const adhocTaskItems = adhocTasks
         .map(t => ({
@@ -93,15 +87,22 @@ export async function GET(request: NextRequest) {
 
       const allItems = [...scheduleItems, ...adhocTaskItems];
 
-      const grouped = userPillars.map(pillar => ({
-        pillar,
-        tasks: allItems.filter(s => s.pillarId === pillar.id),
-      })).filter(g => g.tasks.length > 0);
+      // Group tasks by pillarId in a single pass
+      const tasksByPillar = new Map<number | null, typeof allItems>();
+      for (const item of allItems) {
+        const key = item.pillarId || null;
+        const list = tasksByPillar.get(key);
+        if (list) list.push(item);
+        else tasksByPillar.set(key, [item]);
+      }
 
-      // Add ungrouped (no pillar)
-      const ungrouped = allItems.filter(s => !s.pillarId);
+      const grouped = userPillars
+        .filter(pillar => tasksByPillar.has(pillar.id))
+        .map(pillar => ({ pillar, tasks: tasksByPillar.get(pillar.id)! }));
 
-      if (ungrouped.length > 0) {
+      const ungrouped = tasksByPillar.get(null);
+
+      if (ungrouped && ungrouped.length > 0) {
         grouped.push({
           pillar: { id: 0, userId, name: 'No Pillar', emoji: '📋', color: '#6B7280', defaultBasePoints: 10, description: null, createdAt: new Date(), updatedAt: new Date() } as typeof userPillars[number],
           tasks: ungrouped as typeof grouped[number]['tasks'],
@@ -116,16 +117,16 @@ export async function GET(request: NextRequest) {
     const todayStr = getTodayString();
     const isToday = dateStr === todayStr;
 
-    const tasksForDate = await db
-      .select()
-      .from(tasks)
-      .where(and(eq(tasks.userId, userId), eq(tasks.date, dateStr), eq(tasks.dismissed, false)))
-      .orderBy(asc(tasks.pillarId));
+    const [userPillars, tasksForDate] = await Promise.all([
+      userPillarsPromise,
+      db.select().from(tasks)
+        .where(and(eq(tasks.userId, userId), eq(tasks.date, dateStr), eq(tasks.dismissed, false)))
+        .orderBy(asc(tasks.pillarId)),
+    ]);
 
     // Map tasks to include a completion field for backward compat
     const tasksWithCompletion = tasksForDate.map(t => ({
       ...t,
-      // Include schedule fields for client compat (frequency etc. used by getDateBucket)
       frequency: 'adhoc' as const,
       customDays: null,
       repeatInterval: null,
@@ -142,14 +143,21 @@ export async function GET(request: NextRequest) {
       },
     }));
 
-    const grouped = userPillars.map(pillar => ({
-      pillar,
-      tasks: tasksWithCompletion.filter(t => t.pillarId === pillar.id),
-    })).filter(g => g.tasks.length > 0);
+    // Group tasks by pillarId in a single pass
+    const tasksByPillar = new Map<number | null, typeof tasksWithCompletion>();
+    for (const t of tasksWithCompletion) {
+      const key = t.pillarId || null;
+      const list = tasksByPillar.get(key);
+      if (list) list.push(t);
+      else tasksByPillar.set(key, [t]);
+    }
 
-    // Add ungrouped tasks (no pillar)
-    const ungrouped = tasksWithCompletion.filter(t => !t.pillarId);
-    if (ungrouped.length > 0) {
+    const grouped = userPillars
+      .filter(pillar => tasksByPillar.has(pillar.id))
+      .map(pillar => ({ pillar, tasks: tasksByPillar.get(pillar.id)! }));
+
+    const ungrouped = tasksByPillar.get(null);
+    if (ungrouped && ungrouped.length > 0) {
       grouped.push({
         pillar: { id: 0, userId, name: 'No Pillar', emoji: '📋', color: '#6B7280', defaultBasePoints: 10, description: null, createdAt: new Date(), updatedAt: new Date() } as typeof userPillars[number],
         tasks: ungrouped as typeof grouped[number]['tasks'],

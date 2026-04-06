@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, useEffect } from "react";
+import { useRef, useState, useEffect, memo } from "react";
 import { motion } from "framer-motion";
 import { FaPlus, FaCheck, FaMinus, FaPlay, FaPause, FaStar, FaTimes } from "react-icons/fa";
 import { formatScheduleLabel } from "@/lib/constants";
@@ -42,7 +42,7 @@ interface TaskItemProps {
   formatTime: (seconds: number) => string;
 }
 
-export default function TaskItem({
+const TaskItem = memo(function TaskItem({
   task,
   showDate,
   hidePillar,
@@ -553,4 +553,6 @@ export default function TaskItem({
       </div>
     </div>
   );
-}
+});
+
+export default TaskItem;

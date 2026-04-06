@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { motion } from "framer-motion";
 import { FaPlus, FaChevronDown, FaChevronRight } from "react-icons/fa";
 import AdBanner from "@/app/(common)/AdBanner";
@@ -56,53 +56,53 @@ export default function TasksPage() {
     handleDelete,
   } = hook;
 
-  if (loading) return <TasksLoading />;
-
-  // Build enriched + sorted task list
-  const allEnrichedTasks: EnrichedTask[] = groups.flatMap((group) =>
-    group.tasks.map((task) => ({ ...task, _pillarColor: group.pillar.color, _pillarEmoji: group.pillar.emoji, _pillarName: group.pillar.name }))
-  ).sort((a, b) => {
-    // Starred first
-    const aStarred = a.completion?.isHighlighted ? 1 : 0;
-    const bStarred = b.completion?.isHighlighted ? 1 : 0;
-    if (aStarred !== bStarred) return bStarred - aStarred;
-    // Incomplete first, then skipped, then done
-    const aSkipped = a.completion?.skipped ? 1 : 0;
-    const bSkipped = b.completion?.skipped ? 1 : 0;
-    const aDone = a.completion?.completed || (a.target != null && a.target > 0 && (a.completion?.value || 0) >= a.target) ? 1 : 0;
-    const bDone = b.completion?.completed || (b.target != null && b.target > 0 && (b.completion?.value || 0) >= b.target) ? 1 : 0;
-    const aOrder = aSkipped || aDone;
-    const bOrder = bSkipped || bDone;
-    return aOrder - bOrder;
-  });
-
-  const starredCount = allEnrichedTasks.filter(t => t.completion?.isHighlighted).length;
-  const maxStarsReached = starredCount >= 3;
-
   const isScheduledView = filters.date.type === 'scheduled';
   const isServerFiltered = filters.date.type === 'today' ||
     filters.date.type === 'yesterday' ||
     filters.date.type === 'tomorrow' ||
     (filters.date.type === 'single' && !!filters.date.value);
 
-  const filteredTasks = isScheduledView ? [] : allEnrichedTasks.filter(task => {
-    if (!isServerFiltered && !isTaskInDateRange(task)) return false;
-    if (filters.pillars.length > 0 && !filters.pillars.includes(task.pillarId)) return false;
-    if (filters.goals.length > 0 && !(task.goalId && filters.goals.includes(task.goalId))) return false;
-    return true;
-  });
+  // Build enriched + sorted task list (memoized)
+  const allEnrichedTasks: EnrichedTask[] = useMemo(() =>
+    groups.flatMap((group) =>
+      group.tasks.map((task) => ({ ...task, _pillarColor: group.pillar.color, _pillarEmoji: group.pillar.emoji, _pillarName: group.pillar.name }))
+    ).sort((a, b) => {
+      const aStarred = a.completion?.isHighlighted ? 1 : 0;
+      const bStarred = b.completion?.isHighlighted ? 1 : 0;
+      if (aStarred !== bStarred) return bStarred - aStarred;
+      const aSkipped = a.completion?.skipped ? 1 : 0;
+      const bSkipped = b.completion?.skipped ? 1 : 0;
+      const aDone = a.completion?.completed || (a.target != null && a.target > 0 && (a.completion?.value || 0) >= a.target) ? 1 : 0;
+      const bDone = b.completion?.completed || (b.target != null && b.target > 0 && (b.completion?.value || 0) >= b.target) ? 1 : 0;
+      return (aSkipped || aDone) - (bSkipped || bDone);
+    }), [groups]);
 
-  const excludedGoalIds = new Set(goalsList.filter(g => g.goalType === 'target' || g.goalType === 'outcome').map(g => g.id));
-  // Build total base points (excluding target/outcome goal tasks) for score contribution calc
-  const scorableTasks = filteredTasks.filter(t => t.startDate && (!t.goalId || !excludedGoalIds.has(t.goalId)));
-  const totalBasePoints = scorableTasks.reduce((sum, t) => sum + (t.basePoints || 0) * (t.completion?.isHighlighted ? 2 : 1), 0);
+  const starredCount = useMemo(() => allEnrichedTasks.filter(t => t.completion?.isHighlighted).length, [allEnrichedTasks]);
+  const maxStarsReached = starredCount >= 3;
 
-  const scheduledTasks = isScheduledView ? allEnrichedTasks.filter(task => {
-    if (task.frequency === 'adhoc') return false;
-    if (filters.pillars.length > 0 && !filters.pillars.includes(task.pillarId)) return false;
-    if (filters.goals.length > 0 && !(task.goalId && filters.goals.includes(task.goalId))) return false;
-    return true;
-  }) : [];
+  const filteredTasks = useMemo(() =>
+    isScheduledView ? [] : allEnrichedTasks.filter(task => {
+      if (!isServerFiltered && !isTaskInDateRange(task)) return false;
+      if (filters.pillars.length > 0 && !filters.pillars.includes(task.pillarId)) return false;
+      if (filters.goals.length > 0 && !(task.goalId && filters.goals.includes(task.goalId))) return false;
+      return true;
+    }), [allEnrichedTasks, isScheduledView, isServerFiltered, isTaskInDateRange, filters.pillars, filters.goals]);
+
+  const totalBasePoints = useMemo(() => {
+    const excluded = new Set(goalsList.filter(g => g.goalType === 'target' || g.goalType === 'outcome').map(g => g.id));
+    const scorable = filteredTasks.filter(t => t.startDate && (!t.goalId || !excluded.has(t.goalId)));
+    return scorable.reduce((sum, t) => sum + (t.basePoints || 0) * (t.completion?.isHighlighted ? 2 : 1), 0);
+  }, [filteredTasks, goalsList]);
+
+  const scheduledTasks = useMemo(() =>
+    isScheduledView ? allEnrichedTasks.filter(task => {
+      if (task.frequency === 'adhoc') return false;
+      if (filters.pillars.length > 0 && !filters.pillars.includes(task.pillarId)) return false;
+      if (filters.goals.length > 0 && !(task.goalId && filters.goals.includes(task.goalId))) return false;
+      return true;
+    }) : [], [isScheduledView, allEnrichedTasks, filters.pillars, filters.goals]);
+
+  if (loading) return <TasksLoading />;
 
   const taskItemProps = {
     goalsList,
