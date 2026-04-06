@@ -36,7 +36,7 @@ export async function handleCreateGoal(args: any, userId: string): Promise<strin
   }
 
   const startValue = args.startValue ?? 0;
-  const scheduleDays = args.scheduleDays || null;
+  const scheduleDays = Array.isArray(args.scheduleDays) ? args.scheduleDays : null;
 
   const [goal] = await db.insert(goals).values({
     userId,
@@ -89,7 +89,7 @@ export async function handleEditGoal(args: any, userId: string): Promise<string>
   if (args.dailyTarget !== undefined) updateData.dailyTarget = args.dailyTarget ?? null;
   if (args.completionType !== undefined) updateData.completionType = args.completionType;
   if (args.goalType !== undefined) updateData.goalType = args.goalType;
-  if (args.scheduleDays !== undefined) updateData.scheduleDays = args.scheduleDays ? JSON.stringify(args.scheduleDays) : null;
+  if (args.scheduleDays !== undefined) updateData.scheduleDays = Array.isArray(args.scheduleDays) ? JSON.stringify(args.scheduleDays) : null;
   if (args.autoCreateTasks !== undefined) updateData.autoCreateTasks = args.autoCreateTasks;
   if (args.flexibilityRule !== undefined) updateData.flexibilityRule = args.flexibilityRule;
   if (args.limitValue !== undefined) updateData.limitValue = args.limitValue ?? null;
@@ -115,8 +115,9 @@ export async function handleEditGoal(args: any, userId: string): Promise<string>
 
   // When scheduleDays changed, delete uncompleted future tasks on removed days
   if (args.scheduleDays !== undefined) {
-    const newDays: number[] = args.scheduleDays || [];
-    const oldDays: number[] = existing.scheduleDays ? JSON.parse(existing.scheduleDays) : [];
+    const newDays: number[] = Array.isArray(args.scheduleDays) ? args.scheduleDays : [];
+    const rawOld = existing.scheduleDays ? JSON.parse(existing.scheduleDays) : [];
+    const oldDays: number[] = Array.isArray(rawOld) ? rawOld : [];
     await deleteTasksOnRemovedDays(goalId, userId, oldDays, newDays);
   }
 

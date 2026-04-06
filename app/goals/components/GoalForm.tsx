@@ -51,7 +51,11 @@ export default function GoalForm({
 }) {
   const [form, setForm] = useState<GoalFormState>(() => {
     if (editingOutcome) {
-      const parsedDays: number[] = editingOutcome.scheduleDays ? JSON.parse(editingOutcome.scheduleDays) : [];
+      let parsedDays: number[] = [];
+      try {
+        const raw = editingOutcome.scheduleDays ? JSON.parse(editingOutcome.scheduleDays) : [];
+        parsedDays = Array.isArray(raw) ? raw : [];
+      } catch { parsedDays = []; }
       let frequencyPreset = "daily";
       let customDays: number[] = [];
       const sorted = [...parsedDays].sort().join(',');
