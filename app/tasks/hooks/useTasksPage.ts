@@ -310,8 +310,14 @@ export function useTasksPage() {
     localStorage.setItem('tasks-filters', JSON.stringify(filters));
   }, [filters]);
 
-  // Fetch tasks + score when date filter changes
+  // Fetch tasks + score when date filter changes (skip initial mount — handled by session effect)
+  const dateFilterMounted = useRef(false);
   useEffect(() => {
+    if (!dateFilterMounted.current) {
+      dateFilterMounted.current = true;
+      return;
+    }
+    if (status !== "authenticated") return;
     if (filters.date.type === 'today') {
       fetchDateTasks(today);
       fetchScore(today);
