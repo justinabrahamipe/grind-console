@@ -122,11 +122,13 @@ export async function handleGetTaskDetails(args: any, userId: string): Promise<s
   // Get schedule info if linked
   let frequency = 'adhoc';
   let customDays: string | null = null;
+  let repeatInterval: number | null = null;
+  let schedEndDate: string | null = null;
   if (task.scheduleId) {
     const { taskSchedules } = await import("@/lib/db");
-    const [sched] = await db.select({ frequency: taskSchedules.frequency, customDays: taskSchedules.customDays })
+    const [sched] = await db.select({ frequency: taskSchedules.frequency, customDays: taskSchedules.customDays, repeatInterval: taskSchedules.repeatInterval, endDate: taskSchedules.endDate })
       .from(taskSchedules).where(eq(taskSchedules.id, task.scheduleId));
-    if (sched) { frequency = sched.frequency; customDays = sched.customDays; }
+    if (sched) { frequency = sched.frequency; customDays = sched.customDays; repeatInterval = sched.repeatInterval; schedEndDate = sched.endDate; }
   }
 
   // Get pillar name if linked
@@ -148,12 +150,14 @@ export async function handleGetTaskDetails(args: any, userId: string): Promise<s
     task.description ? `Description: ${task.description}` : null,
     `Status: ${task.completed ? 'done' : task.skipped ? 'skipped' : 'todo'}`,
     `Date: ${task.date || '(no date)'}`,
-    `Type: ${task.completionType} | Frequency: ${frequency}`,
+    `Type: ${task.completionType} | Frequency: ${frequency}${repeatInterval ? ` (every ${repeatInterval} ${frequency === 'interval' ? 'days' : frequency === 'monthly' ? 'months' : 'days'})` : ''}`,
+    customDays ? `Schedule days: ${(() => { const dayNames = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat']; const days = parseScheduleDays(customDays); return frequency === 'monthly' ? days.map(d => `${d}${d===1?'st':d===2?'nd':d===3?'rd':'th'}`).join(', ') : days.map(d => dayNames[d] || d).join(', '); })()}` : null,
+    schedEndDate ? `End date: ${schedEndDate}` : null,
     `Target: ${task.target ?? 'none'} | Value: ${task.value ?? 0} | Unit: ${task.unit || 'none'}`,
     `Points: ${task.pointsEarned}/${task.basePoints} | Flexibility: ${task.flexibilityRule}`,
     `Pillar: ${pillarName ? `${pillarName} (id:${task.pillarId})` : 'none'}`,
     `Goal: ${goalName ? `${goalName} (id:${task.goalId})` : 'none'}`,
-    `Schedule: ${task.scheduleId ? `id:${task.scheduleId}` : 'none'}${customDays ? ` | Days: ${customDays}` : ''}`,
+    `Schedule: ${task.scheduleId ? `id:${task.scheduleId}` : 'none'}`,
     `Highlighted: ${task.isHighlighted} | Dismissed: ${task.dismissed}`,
     task.limitValue != null ? `Limit: ${task.limitValue}` : null,
     task.completedAt ? `Completed at: ${task.completedAt.toISOString()}` : null,
