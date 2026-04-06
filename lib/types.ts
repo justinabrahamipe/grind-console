@@ -106,6 +106,8 @@ export interface Goal {
   unit?: string;
   startValue?: number;
   pillarId?: number | null;
+  startDate?: string | null;
+  targetDate?: string | null;
 }
 
 export interface LinkedTask {
