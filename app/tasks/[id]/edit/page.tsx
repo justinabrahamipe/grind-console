@@ -42,6 +42,7 @@ export default function EditTaskPage() {
               t.frequency = sched.frequency;
               t.customDays = sched.customDays;
               t.repeatInterval = sched.repeatInterval;
+              t.endDate = sched.endDate;
             }
           } catch { /* ignore */ }
         }

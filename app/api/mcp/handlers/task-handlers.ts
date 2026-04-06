@@ -100,6 +100,7 @@ export async function handleCreateTask(args: any, userId: string): Promise<strin
       goalId,
       periodId: goalPeriodId,
       startDate: args.startDate || goalStartDate,
+      endDate: args.endDate || goalEndDate,
     }).returning();
 
     invalidateTaskCache(userId);
@@ -176,6 +177,7 @@ export async function handleEditTask(args: any, userId: string): Promise<string>
     if (args.flexibilityRule !== undefined) scheduleUpdate.flexibilityRule = args.flexibilityRule;
     if (args.limitValue !== undefined) scheduleUpdate.limitValue = args.limitValue ?? null;
     if (args.description !== undefined) scheduleUpdate.description = args.description || null;
+    if (args.endDate !== undefined) scheduleUpdate.endDate = args.endDate || null;
     if (Object.keys(scheduleUpdate).length > 0) {
       await db.update(taskSchedules).set(scheduleUpdate).where(eq(taskSchedules.id, task.scheduleId));
     }
