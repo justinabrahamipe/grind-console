@@ -346,6 +346,9 @@ const runMigrations = async () => {
   // Post-migration: recalculate trajectory scores with the new formula
   await recalcTrajectoryScores(client);
 
+  // Fix corrupt scheduleDays/customDays (one-time, idempotent)
+  await fixScheduleDays(client);
+
   process.exit(0);
 };
 
@@ -454,6 +457,49 @@ async function recalcTrajectoryScores(client: ReturnType<typeof createClient>) {
   }
 
   console.log(`  Updated ${updated}/${scoresResult.rows.length} trajectory scores.`);
-};
+}
+
+const SCHEDULE_DAY_MAP: Record<string, number> = { sun: 0, mon: 1, tue: 2, wed: 3, thu: 4, fri: 5, sat: 6 };
+
+function fixJsonDays(raw: string): string | null {
+  try {
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed) && parsed.every(n => typeof n === 'number')) return null;
+  } catch { /* not valid JSON */ }
+  const cleaned = raw.replace(/["\[\]]/g, '');
+  const days = cleaned.split(',').map(s => SCHEDULE_DAY_MAP[s.trim().toLowerCase()]).filter(n => n !== undefined);
+  if (days.length > 0) return JSON.stringify(days);
+  const single = SCHEDULE_DAY_MAP[cleaned.trim().toLowerCase()];
+  if (single !== undefined) return JSON.stringify([single]);
+  return '[]';
+}
+
+async function fixScheduleDays(client: ReturnType<typeof createClient>) {
+  console.log('\nFixing corrupt scheduleDays/customDays...');
+
+  const goalsResult = await client.execute('SELECT id, name, scheduleDays FROM Goal WHERE scheduleDays IS NOT NULL');
+  let goalFixed = 0;
+  for (const row of goalsResult.rows) {
+    const fixed = fixJsonDays(row.scheduleDays as string);
+    if (fixed !== null) {
+      await client.execute({ sql: 'UPDATE Goal SET scheduleDays = ? WHERE id = ?', args: [fixed, row.id as number] });
+      console.log(`  Goal #${row.id} "${row.name}": "${row.scheduleDays}" -> ${fixed}`);
+      goalFixed++;
+    }
+  }
+
+  const schedsResult = await client.execute('SELECT id, name, customDays FROM TaskSchedule WHERE customDays IS NOT NULL');
+  let schedFixed = 0;
+  for (const row of schedsResult.rows) {
+    const fixed = fixJsonDays(row.customDays as string);
+    if (fixed !== null) {
+      await client.execute({ sql: 'UPDATE TaskSchedule SET customDays = ? WHERE id = ?', args: [fixed, row.id as number] });
+      console.log(`  Schedule #${row.id} "${row.name}": "${row.customDays}" -> ${fixed}`);
+      schedFixed++;
+    }
+  }
+
+  console.log(`  Fixed ${goalFixed} goals, ${schedFixed} task schedules.`);
+}
 
 runMigrations();
