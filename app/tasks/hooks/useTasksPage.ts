@@ -235,13 +235,13 @@ export function useTasksPage() {
   const [timers, setTimers] = useState<Record<number, { running: boolean; elapsed: number; interval?: NodeJS.Timeout }>>({});
 
   // Persist timer state to database
-  const saveTimerToDb = (taskId: number, action: 'start' | 'stop') => {
+  const saveTimerToDb = useCallback((taskId: number, action: 'start' | 'stop') => {
     fetch('/api/tasks/timer', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ taskId, action }),
     }).catch(() => {});
-  };
+  }, []);
 
   // Restore running timers from task data after groups load
   const timerRestoredRef = useRef<Set<number>>(new Set());
@@ -576,21 +576,20 @@ export function useTasksPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [today, viewDate]);
 
-  const handleCheckboxToggle = (task: Task) => {
+  const handleCheckboxToggle = useCallback((task: Task) => {
     const isCurrentlyCompleted = task.completion?.completed || false;
     handleComplete(task.id, !isCurrentlyCompleted, !isCurrentlyCompleted ? 1 : 0);
-  };
+  }, [handleComplete]);
 
-  const handleCountChange = (task: Task, delta: number) => {
+  const handleCountChange = useCallback((task: Task, delta: number) => {
     const current = task.completion?.value || 0;
     const newValue = Math.max(0, current + delta);
     const isLimit = task.flexibilityRule === 'limit_avoid';
-    // Limit tasks never auto-complete — user must manually mark done
     const completed = isLimit ? (task.completion?.completed || false) : (task.target ? newValue >= task.target : newValue > 0);
     handleComplete(task.id, completed, newValue);
-  };
+  }, [handleComplete]);
 
-  const handleNumericSubmit = (task: Task) => {
+  const handleNumericSubmit = useCallback((task: Task) => {
     const raw = pendingValues[task.id];
     if (raw === undefined) return;
     const numValue = parseFloat(raw) || 0;
@@ -598,14 +597,14 @@ export function useTasksPage() {
     const completed = isLimit ? (task.completion?.completed || false) : (task.target && task.target > 0 ? numValue >= task.target : numValue > 0);
     handleComplete(task.id, completed, numValue);
     setPendingValues(prev => { const next = { ...prev }; delete next[task.id]; return next; });
-  };
+  }, [handleComplete, pendingValues]);
 
   const handleMarkDone = (task: Task) => {
     const currentValue = task.completion?.value || 0;
     handleComplete(task.id, true, currentValue);
   };
 
-  const startTimerInternal = (taskId: number, startElapsed: number) => {
+  const startTimerInternal = useCallback((taskId: number, startElapsed: number) => {
     const interval = setInterval(() => {
       setTimers(prev => {
         const current = prev[taskId];
@@ -614,14 +613,14 @@ export function useTasksPage() {
       });
     }, 1000);
     setTimers(prev => ({ ...prev, [taskId]: { running: true, elapsed: startElapsed, interval } }));
-  };
+  }, []);
 
-  const startTimer = (taskId: number, startElapsed: number) => {
+  const startTimer = useCallback((taskId: number, startElapsed: number) => {
     startTimerInternal(taskId, startElapsed);
     saveTimerToDb(taskId, 'start');
-  };
+  }, [startTimerInternal, saveTimerToDb]);
 
-  const handleTimerToggle = (task: Task) => {
+  const handleTimerToggle = useCallback((task: Task) => {
     const timer = timers[task.id];
     if (timer?.running) {
       // Pause: save progress, only mark complete if target reached
@@ -637,22 +636,20 @@ export function useTasksPage() {
       const elapsed = timer?.elapsed || ((task.completion?.value || 0) * 60);
       startTimer(task.id, elapsed);
     }
-  };
+  }, [timers, handleComplete, startTimer, saveTimerToDb]);
 
-  const handleDurationManualSubmit = (task: Task) => {
+  const handleDurationManualSubmit = useCallback((task: Task) => {
     const raw = pendingValues[task.id];
     if (raw === undefined) return;
     const minutes = parseFloat(raw) || 0;
     const elapsedSec = minutes * 60;
-    // Update elapsed time without starting timer
     setTimers(prev => ({ ...prev, [task.id]: { running: false, elapsed: elapsedSec } }));
     saveTimerToDb(task.id, 'stop');
-    // Only mark complete if target is reached (limit tasks never auto-complete)
     const isLimit = task.flexibilityRule === 'limit_avoid';
     const targetReached = isLimit ? (task.completion?.completed || false) : (task.target ? elapsedSec >= task.target * 60 : minutes > 0);
     handleComplete(task.id, targetReached, minutes);
     setPendingValues(prev => { const next = { ...prev }; delete next[task.id]; return next; });
-  };
+  }, [pendingValues, handleComplete, saveTimerToDb]);
 
   const handleHighlightToggle = useCallback(async (taskId: number) => {
     const allTasks = groups.flatMap(g => g.tasks);
@@ -689,11 +686,11 @@ export function useTasksPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [viewDate, groups]);
 
-  const formatTime = (seconds: number) => {
+  const formatTime = useCallback((seconds: number) => {
     const m = Math.floor(seconds / 60);
     const s = seconds % 60;
     return `${m}:${String(s).padStart(2, '0')}`;
-  };
+  }, []);
 
   // Clean up timers on unmount
   useEffect(() => {
@@ -785,7 +782,7 @@ export function useTasksPage() {
     }
   };
 
-  const handleDiscard = async (task: Task) => {
+  const handleDiscard = useCallback(async (task: Task) => {
     setOpenMenuId(null);
     const isSkipped = task.completion?.skipped || false;
     setActionLoading(prev => ({ ...prev, [task.id]: true }));
@@ -810,7 +807,8 @@ export function useTasksPage() {
     } finally {
       setActionLoading(prev => ({ ...prev, [task.id]: false }));
     }
-  };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [viewDate]);
 
   const handleMoveDate = async (task: Task, direction: -1 | 0 | 1) => {
     setOpenMenuId(null);
