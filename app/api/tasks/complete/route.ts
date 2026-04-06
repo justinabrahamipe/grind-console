@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 import { getAuthenticatedUserId, errorResponse } from "@/lib/api-utils";
-import { getYesterdayString } from "@/lib/format";
 import { completeTask } from "@/lib/complete-task";
 import { db, tasks } from "@/lib/db";
 import { eq, and } from "drizzle-orm";
@@ -34,8 +33,12 @@ export async function POST(request: Request) {
     }
 
     // Only allow changes for today and yesterday — older tasks are frozen
-    const yesterdayStr = getYesterdayString();
-    if (task.date < yesterdayStr) {
+    // Use client-provided date to derive yesterday (avoids server timezone mismatch)
+    const refDate = date || task.date;
+    const clientYesterday = new Date(refDate + 'T12:00:00');
+    clientYesterday.setDate(clientYesterday.getDate() - 1);
+    const yesterdayStr = clientYesterday.toISOString().split('T')[0];
+    if (task.date && task.date < yesterdayStr) {
       return NextResponse.json({ error: "Cannot modify tasks older than yesterday" }, { status: 403 });
     }
 

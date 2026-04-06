@@ -295,7 +295,7 @@ const TaskItem = memo(function TaskItem({
       )}
       <div className="relative flex items-center gap-1.5 w-full overflow-hidden">
         {/* Left: star + name, pillar, badges */}
-        {!isFrozen && handleHighlightToggle && (isHighlighted || !maxStarsReached) && (
+        {!isFrozen && handleHighlightToggle && task.date && (isHighlighted || !maxStarsReached) && (
           <button
             onClick={(e) => { e.stopPropagation(); handleHighlightToggle(task.id); }}
             className={`shrink-0 transition-colors ${
