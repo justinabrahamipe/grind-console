@@ -153,6 +153,7 @@ const TOOLS = [
         flexibilityRule: { type: "string", description: "One of: must_today, at_least, limit_avoid. Defaults to must_today." },
         limitValue: { type: "number", description: "Limit value for limit_avoid tasks (max allowed)." },
         startDate: { type: "string", description: "Start date for recurring tasks (YYYY-MM-DD). Inherited from goal if linked." },
+        endDate: { type: "string", description: "End date for recurring tasks (YYYY-MM-DD). Inherited from goal target date if linked." },
         date: { type: "string", description: "Date for adhoc tasks (YYYY-MM-DD). Inherited from goal start date if linked." },
         description: { type: "string", description: "Optional description/notes for the task." },
       },

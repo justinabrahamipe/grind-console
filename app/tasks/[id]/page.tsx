@@ -486,7 +486,12 @@ export default function TaskDetailPage() {
           )}
           {taskDate && (
             <span className="text-xs px-2.5 py-1 rounded-full bg-zinc-100 dark:bg-zinc-700 text-zinc-600 dark:text-zinc-400 font-medium">
-              {formatDate(taskDate, dateFormat)}
+              {task.frequency && task.frequency !== "adhoc" ? `From ${formatDate(taskDate, dateFormat)}` : formatDate(taskDate, dateFormat)}
+            </span>
+          )}
+          {task.frequency && task.frequency !== "adhoc" && task.endDate && (
+            <span className="text-xs px-2.5 py-1 rounded-full bg-zinc-100 dark:bg-zinc-700 text-zinc-600 dark:text-zinc-400 font-medium">
+              Until {formatDate(task.endDate, dateFormat)}
             </span>
           )}
           <span className="text-xs px-2.5 py-1 rounded-full bg-zinc-100 dark:bg-zinc-700 text-zinc-600 dark:text-zinc-400 font-medium">
