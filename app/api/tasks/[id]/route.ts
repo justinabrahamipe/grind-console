@@ -39,7 +39,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
       // Merge schedule data (frequency, customDays, repeatInterval) if available
       if (task.scheduleId) {
         const [schedule] = await db
-          .select({ frequency: taskSchedules.frequency, customDays: taskSchedules.customDays, repeatInterval: taskSchedules.repeatInterval })
+          .select({ frequency: taskSchedules.frequency, customDays: taskSchedules.customDays, repeatInterval: taskSchedules.repeatInterval, endDate: taskSchedules.endDate })
           .from(taskSchedules)
           .where(eq(taskSchedules.id, task.scheduleId));
         if (schedule) {
@@ -151,6 +151,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
           if (body[field] !== undefined) scheduleUpdate[field] = body[field];
         }
         if (body.startDate !== undefined) scheduleUpdate.startDate = body.startDate;
+        if (body.endDate !== undefined) scheduleUpdate.endDate = body.endDate;
         if (Object.keys(scheduleUpdate).length > 0) {
           await db.update(taskSchedules).set(scheduleUpdate)
             .where(eq(taskSchedules.id, taskInstance.scheduleId));
@@ -161,7 +162,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
     }
 
     const updateData: Record<string, unknown> = {};
-    const fields = ['name', 'pillarId', 'completionType', 'target', 'unit', 'flexibilityRule', 'frequency', 'customDays', 'repeatInterval', 'basePoints', 'limitValue', 'goalId', 'periodId', 'startDate', 'description'];
+    const fields = ['name', 'pillarId', 'completionType', 'target', 'unit', 'flexibilityRule', 'frequency', 'customDays', 'repeatInterval', 'basePoints', 'limitValue', 'goalId', 'periodId', 'startDate', 'endDate', 'description'];
 
     for (const field of fields) {
       if (body[field] !== undefined) {

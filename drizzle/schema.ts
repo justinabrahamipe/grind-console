@@ -106,6 +106,7 @@ export const taskSchedules = sqliteTable('TaskSchedule', {
   goalId: integer('goalId').references(() => goals.id, { onDelete: 'set null' }),
   periodId: integer('periodId').references(() => cycles.id, { onDelete: 'set null' }),
   startDate: text('startDate'), // optional YYYY-MM-DD, schedule only active from this date
+  endDate: text('endDate'), // optional YYYY-MM-DD, schedule stops generating tasks after this date
   createdAt: integer('createdAt', { mode: 'timestamp' }).notNull().default(sql`(unixepoch())`),
   updatedAt: integer('updatedAt', { mode: 'timestamp' }).notNull().default(sql`(unixepoch())`),
 }, (table) => ({

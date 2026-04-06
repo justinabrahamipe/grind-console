@@ -28,6 +28,7 @@ export default function NewTaskPage() {
         setGoals(o.map((g: Goal & { pillarEmoji?: string; pillarName?: string }) => ({
           id: g.id, name: g.name, goalType: g.goalType,
           pillarEmoji: g.pillarEmoji, pillarName: g.pillarName,
+          pillarId: g.pillarId, startDate: g.startDate, targetDate: g.targetDate,
         })));
         setLoading(false);
       });

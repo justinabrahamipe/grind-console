@@ -346,6 +346,15 @@ const runMigrations = async () => {
   // Post-migration: recalculate trajectory scores with the new formula
   await recalcTrajectoryScores(client);
 
+  // Add endDate column to TaskSchedule (idempotent)
+  try {
+    const tsInfo = await client.execute("PRAGMA table_info('TaskSchedule')");
+    if (!tsInfo.rows.some(r => r.name === 'endDate')) {
+      console.log('  Adding TaskSchedule.endDate column...');
+      await client.execute('ALTER TABLE "TaskSchedule" ADD COLUMN "endDate" TEXT');
+    }
+  } catch (e: any) { console.log('  TaskSchedule.endDate:', e.message); }
+
   // Fix corrupt scheduleDays/customDays (one-time, idempotent)
   await fixScheduleDays(client);
 

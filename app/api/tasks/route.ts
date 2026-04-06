@@ -201,7 +201,7 @@ export async function POST(request: Request) {
     const userId = await getAuthenticatedUserId();
 
     const body = await request.json();
-    const { pillarId, name, completionType, target, unit, flexibilityRule, limitValue, frequency, customDays, repeatInterval, basePoints, goalId, periodId, startDate, description } = body;
+    const { pillarId, name, completionType, target, unit, flexibilityRule, limitValue, frequency, customDays, repeatInterval, basePoints, goalId, periodId, startDate, endDate, description } = body;
 
     if (!name) {
       return NextResponse.json({ error: "name is required" }, { status: 400 });
@@ -240,6 +240,7 @@ export async function POST(request: Request) {
         goalId: goalId || null,
         periodId: periodId || null,
         startDate: startDate || null,
+        endDate: endDate || null,
       }).returning();
 
       // Invalidate cache and generate task instances for today + 7 days
