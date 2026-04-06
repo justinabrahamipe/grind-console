@@ -160,7 +160,8 @@ export function useTasksPage() {
   const { data: session, status } = useSession();
   const { dateFormat } = useTheme();
   const router = useRouter();
-  const [groups, setGroups] = useState<TaskGroup[]>(() => {
+  const groupsRef = useRef<TaskGroup[]>([]);
+  const [groups, _setGroups] = useState<TaskGroup[]>(() => {
     if (typeof window !== 'undefined') {
       try {
         const cached = localStorage.getItem('tasks-cache');
@@ -172,6 +173,13 @@ export function useTasksPage() {
     }
     return [];
   });
+  const setGroups = useCallback((value: TaskGroup[] | ((prev: TaskGroup[]) => TaskGroup[])) => {
+    _setGroups(prev => {
+      const next = typeof value === 'function' ? value(prev) : value;
+      groupsRef.current = next;
+      return next;
+    });
+  }, []);
   const [pillars, setPillars] = useState<Pillar[]>([]);
   const [goalsList, setGoalsList] = useState<Outcome[]>([]);
   const [cycles, setCycles] = useState<Cycle[]>([]);
@@ -652,7 +660,7 @@ export function useTasksPage() {
   }, [pendingValues, handleComplete, saveTimerToDb]);
 
   const handleHighlightToggle = useCallback(async (taskId: number) => {
-    const allTasks = groups.flatMap(g => g.tasks);
+    const allTasks = groupsRef.current.flatMap(g => g.tasks);
     const groupTask = allTasks.find(t => t.id === taskId);
     const currentlyHighlighted = groupTask?.completion?.isHighlighted || false;
 
@@ -684,7 +692,7 @@ export function useTasksPage() {
       setActionLoading(prev => ({ ...prev, [taskId]: false }));
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [viewDate, groups]);
+  }, [viewDate]);
 
   const formatTime = useCallback((seconds: number) => {
     const m = Math.floor(seconds / 60);
