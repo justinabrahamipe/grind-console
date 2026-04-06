@@ -1,5 +1,6 @@
 "use client";
 
+import { parseScheduleDays } from "@/lib/format";
 import {
   LineChart,
   Line,
@@ -40,7 +41,7 @@ export default function ProgressChart({ outcome, logs, color }: {
     const endDayNum = toDayNum(endDay);
 
     // Parse scheduled days (e.g., [1,2,3,4,5] for Mon-Fri)
-    const scheduleDays: number[] = outcome.scheduleDays ? JSON.parse(outcome.scheduleDays) : [];
+    const scheduleDays: number[] = parseScheduleDays(outcome.scheduleDays);
 
     // Count total scheduled days and build a map of cumulative scheduled days per calendar day
     // This lets us draw ideal/required lines that only progress on scheduled days

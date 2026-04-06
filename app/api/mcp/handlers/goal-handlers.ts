@@ -1,6 +1,6 @@
 import { db, goals, tasks, taskSchedules, pillars, cycles } from "@/lib/db";
 import { eq, and } from "drizzle-orm";
-import { getTodayString } from "@/lib/format";
+import { getTodayString, parseScheduleDays } from "@/lib/format";
 import { createAutoLog } from "@/lib/auto-log";
 import { generateGoalTasks } from "@/lib/ensure-upcoming-tasks";
 import { deleteFutureUncompletedTasks, deleteTasksBeyondDate, deleteTasksOnRemovedDays, regenerateGoalTasksIfNeeded } from "@/lib/goal-mutations";
@@ -116,8 +116,7 @@ export async function handleEditGoal(args: any, userId: string): Promise<string>
   // When scheduleDays changed, delete uncompleted future tasks on removed days
   if (args.scheduleDays !== undefined) {
     const newDays: number[] = Array.isArray(args.scheduleDays) ? args.scheduleDays : [];
-    const rawOld = existing.scheduleDays ? JSON.parse(existing.scheduleDays) : [];
-    const oldDays: number[] = Array.isArray(rawOld) ? rawOld : [];
+    const oldDays: number[] = parseScheduleDays(existing.scheduleDays);
     await deleteTasksOnRemovedDays(goalId, userId, oldDays, newDays);
   }
 

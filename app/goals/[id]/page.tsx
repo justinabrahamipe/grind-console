@@ -25,7 +25,7 @@ import ProgressChart from "../components/ProgressChart";
 import LogModal from "../components/LogModal";
 import TaskItem from "@/app/tasks/components/TaskItem";
 import type { EnrichedTask } from "@/app/tasks/components/TaskItem";
-import { formatDate, getTodayString } from "@/lib/format";
+import { formatDate, getTodayString, parseScheduleDays } from "@/lib/format";
 import { useTheme } from "@/components/ThemeProvider";
 
 export default function GoalDetailPage() {
@@ -107,7 +107,7 @@ export default function GoalDetailPage() {
     } catch (err) {
       console.error("Failed to delete task:", err);
     }
-    setDeleteConfirmId(null);
+    setConfirmDialog(null);
   };
 
   useEffect(() => {
@@ -169,7 +169,7 @@ export default function GoalDetailPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session, status, router, id]);
 
-  const scheduleDays: number[] = outcome?.scheduleDays ? JSON.parse(outcome.scheduleDays) : [];
+  const scheduleDays: number[] = parseScheduleDays(outcome?.scheduleDays);
   const isHabitual = outcome?.goalType === "habitual";
   const isActivityGoal = outcome?.goalType === "target" || outcome?.goalType === "habitual";
   const color = outcome?.pillarColor || "#3B82F6";
@@ -305,7 +305,7 @@ export default function GoalDetailPage() {
           name: outcome.name, targetValue: outcome.targetValue, unit: outcome.unit,
           pillarId: outcome.pillarId, periodId: cycleId, goalType: outcome.goalType,
           completionType: outcome.completionType, dailyTarget: outcome.dailyTarget,
-          scheduleDays: outcome.scheduleDays ? JSON.parse(outcome.scheduleDays) : null,
+          scheduleDays: parseScheduleDays(outcome.scheduleDays),
           autoCreateTasks: outcome.autoCreateTasks, startValue: outcome.startValue,
           startDate: cycle.startDate, targetDate: cycle.endDate,
         }),
@@ -368,7 +368,7 @@ export default function GoalDetailPage() {
         const found = goalsData.find((o: Outcome) => String(o.id) === String(outcome.id));
         if (found) setOutcome(found);
         setLogs(logData);
-        const goalCompletions = completions[outcome.id] || [];
+        const goalCompletions = (completions as Record<number, { date: string; value: number; completed: boolean }[]>)[outcome.id] || [];
         const todayStr = new Date().toISOString().split('T')[0];
         const newTasks: EnrichedTask[] = goalTasks
           .filter((t: { goalId: number }) => t.goalId === outcome.id)
@@ -633,22 +633,18 @@ export default function GoalDetailPage() {
                   hidePillar
                   showDate={task.startDate ? formatDate(task.startDate, dateFormat) : undefined}
                   goalsList={[]}
-                  cycles={[]}
+                  cycles={cycles}
                   maxStarsReached={true}
                   timers={timers}
                   pendingValues={pendingValues}
                   setPendingValues={setPendingValues}
-                  openMenuId={openMenuId}
-                  setOpenMenuId={setOpenMenuId}
                   actionLoading={actionLoading}
-                  menuRef={menuRef}
                   router={router}
                   handleCheckboxToggle={handleCheckboxToggle}
                   handleCountChange={handleCountChange}
                   handleNumericSubmit={handleNumericSubmit}
                   handleTimerToggle={handleTimerToggle}
                   handleDurationManualSubmit={handleDurationManualSubmit}
-                  handleDelete={handleTaskDelete}
                   handleDiscard={handleDiscard}
                   formatTime={formatTime}
                 />

@@ -7,7 +7,7 @@ import { Outcome, Pillar, CycleOption } from "../types";
 import type { GoalFormState } from "@/lib/types";
 import { DAY_NAMES, FREQUENCY_PRESETS, REPEAT_UNITS } from "../constants";
 import PerSessionLabel from "./PerSessionLabel";
-import { getTodayString } from "@/lib/format";
+import { getTodayString, parseScheduleDays } from "@/lib/format";
 
 const DEFAULT_FORM: GoalFormState = {
   name: "",
@@ -51,11 +51,7 @@ export default function GoalForm({
 }) {
   const [form, setForm] = useState<GoalFormState>(() => {
     if (editingOutcome) {
-      let parsedDays: number[] = [];
-      try {
-        const raw = editingOutcome.scheduleDays ? JSON.parse(editingOutcome.scheduleDays) : [];
-        parsedDays = Array.isArray(raw) ? raw : [];
-      } catch { parsedDays = []; }
+      const parsedDays: number[] = parseScheduleDays(editingOutcome.scheduleDays);
       let frequencyPreset = "daily";
       let customDays: number[] = [];
       const sorted = [...parsedDays].sort().join(',');

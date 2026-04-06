@@ -207,6 +207,7 @@ export interface OutcomeData {
   targetDate: string | null;
   dailyTarget: number | null;
   completionType: string;
+  periodId: number | null;
 }
 
 // ------ Momentum types ------

@@ -32,7 +32,7 @@ export async function GET() {
 
     const sub = subscriptions.data[0];
     return NextResponse.json({
-      nextBillingDate: new Date(sub.current_period_end * 1000).toISOString(),
+      nextBillingDate: new Date((sub as unknown as { current_period_end: number }).current_period_end * 1000).toISOString(),
       startDate: new Date(sub.start_date * 1000).toISOString(),
       status: sub.status,
       cancelAtPeriodEnd: sub.cancel_at_period_end,

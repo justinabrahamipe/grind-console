@@ -2,6 +2,7 @@
 
 import { FaFire } from "react-icons/fa";
 import type { OutcomeData } from "@/lib/types";
+import { parseScheduleDays } from "@/lib/format";
 
 interface HabitTrackerProps {
   outcomesData: OutcomeData[];
@@ -55,7 +56,7 @@ export default function HabitTracker({ outcomesData, completionDates, today }: H
       {/* Goal rows */}
       <div className="space-y-1">
         {habitGoals.map(goal => {
-          const scheduleDays: number[] = goal.scheduleDays ? JSON.parse(goal.scheduleDays) : [];
+          const scheduleDays: number[] = parseScheduleDays(goal.scheduleDays);
           const entries = completionDates[goal.id] || [];
 
           // Build a map of date -> total value for this goal

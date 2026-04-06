@@ -3,7 +3,7 @@ import { getAuthenticatedUserId, errorResponse } from "@/lib/api-utils";
 import { db, goals, tasks, taskSchedules } from "@/lib/db";
 import { eq, and } from "drizzle-orm";
 import { createAutoLog } from "@/lib/auto-log";
-import { getTodayString } from "@/lib/format";
+import { getTodayString, parseScheduleDays } from "@/lib/format";
 import { deleteFutureUncompletedTasks, deleteTasksBeyondDate, deleteTasksOnRemovedDays, regenerateGoalTasksIfNeeded } from "@/lib/goal-mutations";
 
 export async function PUT(request: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -71,8 +71,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
     // When scheduleDays changed, delete uncompleted future tasks on removed days
     if (body.scheduleDays !== undefined) {
       const newDays: number[] = body.scheduleDays || [];
-      const rawOld = existing[0].scheduleDays ? JSON.parse(existing[0].scheduleDays) : [];
-      const oldDays: number[] = Array.isArray(rawOld) ? rawOld : [];
+      const oldDays: number[] = parseScheduleDays(existing[0].scheduleDays);
       await deleteTasksOnRemovedDays(outcomeId, userId, oldDays, newDays);
     }
 

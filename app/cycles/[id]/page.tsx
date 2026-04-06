@@ -13,6 +13,7 @@ import { useRouter, useParams } from "next/navigation";
 import { getCurrentWeekNumber, getGoalStatus, getTotalWeeks } from "@/lib/cycle-scoring";
 import { computeCycleAnalytics } from "@/lib/cycle-analytics";
 import { calculateMomentum } from "@/lib/momentum";
+import { parseScheduleDays } from "@/lib/format";
 import type { CycleDetail, GoalForMomentum } from "@/lib/types";
 import { useTheme } from "@/components/ThemeProvider";
 
@@ -117,7 +118,7 @@ export default function CycleDetailPage() {
     const goalsWithAdherence = selectedCycle.goals.map(g => {
       if (g.goalType !== "habitual") return g;
       const entries = completionDates[g.id] || [];
-      const sched: number[] = (() => { try { return JSON.parse(g.scheduleDays || "[]"); } catch { return []; } })();
+      const sched: number[] = parseScheduleDays(g.scheduleDays);
       const cycleStart = selectedCycle.startDate;
       const cycleEnd = selectedCycle.endDate;
       const todayStr = new Date().toISOString().split("T")[0];
@@ -390,7 +391,7 @@ export default function CycleDetailPage() {
               let streak = 0;
               if (isHabitual && selectedCycle.startDate) {
                 const entries = completionDates[goal.id] || [];
-                const sched: number[] = (() => { try { return JSON.parse(goal.scheduleDays || "[]"); } catch { return []; } })();
+                const sched: number[] = parseScheduleDays(goal.scheduleDays);
                 const cycleStart = selectedCycle.startDate;
                 const todayStr = new Date().toISOString().split("T")[0];
                 const cycleEnd = selectedCycle.endDate < todayStr ? selectedCycle.endDate : todayStr;

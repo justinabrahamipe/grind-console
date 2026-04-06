@@ -1,4 +1,5 @@
 import { countScheduledDaysInRange } from './effort-calculations';
+import { parseScheduleDays } from '@/lib/format';
 import type { GoalForMomentum, GoalLogEntry, GoalMomentum, MomentumSummary } from '@/lib/types';
 
 export type { GoalMomentum, MomentumSummary } from '@/lib/types';
@@ -12,7 +13,7 @@ function calculateTargetMomentum(
   goal: GoalForMomentum,
   today: string
 ): GoalMomentum {
-  const scheduleDays: number[] = goal.scheduleDays ? JSON.parse(goal.scheduleDays) : [];
+  const scheduleDays: number[] = parseScheduleDays(goal.scheduleDays);
   const startDate = goal.startDate || today;
   const endDate = goal.targetDate || today;
 

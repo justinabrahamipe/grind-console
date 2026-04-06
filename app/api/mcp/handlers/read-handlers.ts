@@ -1,6 +1,6 @@
 import { db, locationLogs, tasks, goals, pillars, dailyScores, cycles, contactMessages } from "@/lib/db";
 import { eq, and, desc, gte, lte } from "drizzle-orm";
-import { getTodayString } from "@/lib/format";
+import { getTodayString, parseScheduleDays } from "@/lib/format";
 
 function daysAgo(n: number) {
   const d = new Date();
@@ -44,11 +44,9 @@ export async function handleGetGoals(args: any, userId: string): Promise<string>
     if (g.completionType !== 'checkbox') parts.push(`type: ${g.completionType}`);
     if (g.dailyTarget) parts.push(`daily: ${g.dailyTarget}`);
     if (g.scheduleDays) {
-      try {
-        const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-        const days = JSON.parse(g.scheduleDays) as number[];
-        parts.push(`days: ${days.map(d => dayNames[d] || d).join(',')}`);
-      } catch { parts.push(`days: ${g.scheduleDays}`); }
+      const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+      const days = parseScheduleDays(g.scheduleDays);
+      if (days.length > 0) parts.push(`days: ${days.map(d => dayNames[d] || d).join(',')}`);
     }
     if (g.autoCreateTasks) parts.push('auto-tasks');
     if (g.flexibilityRule !== 'must_today') parts.push(`rule: ${g.flexibilityRule}`);

@@ -60,7 +60,7 @@ export default function CalendarHeatmap({ scores }: CalendarHeatmapProps) {
       const firstDow = daysArray[0].dayOfWeek;
       const mondayOffset = firstDow === 0 ? 6 : firstDow - 1;
       for (let i = 0; i < mondayOffset; i++) {
-        currentWeek.push({ date: "", score: null, dayOfWeek: -1 });
+        currentWeek.push({ date: "", score: null, isToday: false, dayOfWeek: -1 });
       }
     }
 

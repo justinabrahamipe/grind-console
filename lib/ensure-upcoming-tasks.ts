@@ -2,7 +2,7 @@ import { db, taskSchedules, tasks, goals } from "@/lib/db";
 import { eq, and, inArray, sql } from "drizzle-orm";
 import { isScheduleForExactDate } from "@/lib/task-schedule";
 import { countScheduledDaysInRange } from "@/lib/effort-calculations";
-import { getTodayString } from "@/lib/format";
+import { getTodayString, parseScheduleDays } from "@/lib/format";
 
 // In-memory cache: userId -> last date we ran
 const lastRunCache = new Map<string, string>();
@@ -135,7 +135,7 @@ export async function generateGoalTasks(userId: string, goalId: number) {
 
   if (!outcome || !outcome.autoCreateTasks || outcome.status !== 'active') return;
 
-  const scheduleDays: number[] = outcome.scheduleDays ? JSON.parse(outcome.scheduleDays) : [];
+  const scheduleDays: number[] = parseScheduleDays(outcome.scheduleDays);
   if (scheduleDays.length === 0) return;
 
   const todayStr = getTodayString();
@@ -270,7 +270,7 @@ export async function recalcTargetGoalTasks(userId: string) {
     if (g.goalType === 'habitual' || g.goalType === 'outcome') return false;
     const ct = g.completionType || 'numeric';
     if (ct === 'checkbox') return false;
-    const days: number[] = g.scheduleDays ? JSON.parse(g.scheduleDays) : [];
+    const days: number[] = parseScheduleDays(g.scheduleDays);
     return days.length > 0;
   });
 
