@@ -6,6 +6,20 @@ import { saveDailyScore } from "@/lib/save-daily-score";
 import { ensureUpcomingTasks, invalidateTaskCache } from "@/lib/ensure-upcoming-tasks";
 import { completeTask } from "@/lib/complete-task";
 
+const DAY_MAP: Record<string, number> = { sun: 0, mon: 1, tue: 2, wed: 3, thu: 4, fri: 5, sat: 6 };
+
+function parseCustomDaysInput(input: string | null | undefined): string | null {
+  if (!input) return null;
+  // Already a JSON array
+  try {
+    const parsed = JSON.parse(input);
+    if (Array.isArray(parsed)) return JSON.stringify(parsed);
+  } catch { /* not JSON, try comma-separated */ }
+  // Comma-separated day names: "mon,tue,wed" -> [1,2,3]
+  const days = input.split(',').map(s => DAY_MAP[s.trim().toLowerCase()]).filter(n => n !== undefined);
+  return days.length > 0 ? JSON.stringify(days) : null;
+}
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function handleCompleteTask(args: any, userId: string): Promise<string> {
   const taskId = parseInt(args.taskId);
@@ -65,7 +79,7 @@ export async function handleCreateTask(args: any, userId: string): Promise<strin
       flexibilityRule: args.flexibilityRule || 'must_today',
       limitValue: args.limitValue ?? null,
       frequency,
-      customDays: args.customDays || null,
+      customDays: parseCustomDaysInput(args.customDays),
       repeatInterval: null,
       basePoints,
       goalId: args.goalId ? parseInt(args.goalId) : null,

@@ -7,7 +7,7 @@ import { formatScheduleLabel } from "@/lib/constants";
 import { getProgressColor } from "@/lib/scoring";
 import { countScheduledDaysInRange } from "@/lib/effort-calculations";
 import { useTheme } from "@/components/ThemeProvider";
-import { getTodayString, getYesterdayString, parseScheduleDays } from "@/lib/format";
+import { getTodayString, getYesterdayString, parseScheduleDays, parseCustomDays } from "@/lib/format";
 import type { Task, Outcome, Cycle } from "@/lib/types";
 import { AppRouterInstance } from "next/dist/shared/lib/app-router-context.shared-runtime";
 
@@ -383,7 +383,7 @@ export default function TaskItem({
             <div className="mt-0.5">
               <span className="text-[11px] px-1.5 py-px rounded-full font-medium bg-zinc-100 text-zinc-600 dark:bg-zinc-700 dark:text-zinc-400">
                 {task.frequency === 'monthly' ? `Monthly` :
-                 task.frequency === 'custom' ? (task.customDays ? formatScheduleLabel(JSON.parse(task.customDays)) : 'Custom') :
+                 task.frequency === 'custom' ? (task.customDays ? formatScheduleLabel(parseCustomDays(task.customDays)) : 'Custom') :
                  task.frequency === 'interval' ? `Every ${(task as unknown as Record<string, unknown>).repeatInterval || '?'} days` :
                  task.frequency}
               </span>
