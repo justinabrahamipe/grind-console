@@ -234,6 +234,7 @@ const TOOLS = [
         autoCreateTasks: { type: "boolean", description: "Auto-create daily tasks." },
         flexibilityRule: { type: "string", description: "One of: must_today, at_least, limit_avoid." },
         limitValue: { type: "number", description: "Limit value for limit_avoid." },
+        basePoints: { type: "number", description: "Points awarded per task completion." },
       },
       required: ["goalId"],
     },
