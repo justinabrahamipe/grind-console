@@ -157,6 +157,11 @@ export async function handleEditTask(args: any, userId: string): Promise<string>
   if (args.periodId !== undefined) updateData.periodId = args.periodId === 0 ? null : args.periodId;
   if (args.description !== undefined) updateData.description = args.description || null;
 
+  // Clear highlight when date is removed
+  if (args.date === '' || args.date === null) {
+    updateData.isHighlighted = false;
+  }
+
   if (Object.keys(updateData).length === 0) return "Error: No fields to update.";
 
   await db.update(tasks).set(updateData).where(eq(tasks.id, taskId));
