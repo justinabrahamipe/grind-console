@@ -28,6 +28,7 @@ export interface Task {
   goalId: number | null;
   periodId: number | null;
   startDate: string | null;
+  endDate?: string | null;
   flexibilityRule?: string;
   limitValue?: number | null;
   description?: string | null;
@@ -345,6 +346,7 @@ export interface TaskFormState {
   basePoints: string;
   pointsMode: 'pillar' | 'manual';
   startDate: string;
+  endDate: string;
 }
 
 export interface GoalFormState {

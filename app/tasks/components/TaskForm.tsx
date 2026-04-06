@@ -97,6 +97,7 @@ export default function TaskForm({
         basePoints: editingTask.basePoints.toString(),
         pointsMode: isPillarDefault ? 'pillar' as const : 'manual' as const,
         startDate: editingTask.startDate || "",
+        endDate: editingTask.endDate || "",
       };
     }
     return {
@@ -130,10 +131,14 @@ export default function TaskForm({
         } catch {}
         return '';
       })(),
+      endDate: '',
     };
   });
 
   const [saving, setSaving] = useState(false);
+
+  const today = new Date().toISOString().split('T')[0];
+  const activeGoals = goals.filter(g => !g.targetDate || g.targetDate >= today);
 
   const toggleCustomDay = (day: number) => {
     setForm((prev) => ({
@@ -186,6 +191,7 @@ export default function TaskForm({
     };
 
     body.startDate = form.startDate || null;
+    if (form.frequencyPreset !== 'adhoc' && form.endDate) body.endDate = form.endDate;
     body.flexibilityRule = form.flexibilityRule;
     if (form.target) body.target = parseFloat(form.target);
     if (form.unit) body.unit = form.unit;
@@ -264,18 +270,23 @@ export default function TaskForm({
             onChange={(e) => {
               const goalId = parseInt(e.target.value) || 0;
               const goal = goals.find(g => g.id === goalId);
-              setForm({
-                ...form,
-                goalId,
-                startDate: goal?.startDate || form.startDate,
-                pillarId: goal?.pillarId || form.pillarId,
-              });
+              if (goal) {
+                setForm({
+                  ...form,
+                  goalId,
+                  startDate: goal.startDate || form.startDate,
+                  endDate: goal.targetDate || form.endDate,
+                  pillarId: goal.pillarId ?? form.pillarId,
+                });
+              } else {
+                setForm({ ...form, goalId });
+              }
             }}
-            disabled={goals.length === 0}
-            className={`w-full px-3 py-2 border border-zinc-300 dark:border-zinc-600 rounded-lg bg-white dark:bg-zinc-700 text-zinc-900 dark:text-white ${goals.length === 0 ? 'opacity-50 cursor-not-allowed' : ''}`}
+            disabled={activeGoals.length === 0}
+            className={`w-full px-3 py-2 border border-zinc-300 dark:border-zinc-600 rounded-lg bg-white dark:bg-zinc-700 text-zinc-900 dark:text-white ${activeGoals.length === 0 ? 'opacity-50 cursor-not-allowed' : ''}`}
           >
-            <option value={0}>{goals.length === 0 ? 'No goals created' : 'None'}</option>
-            {goals.map((g) => (
+            <option value={0}>{activeGoals.length === 0 ? 'No active goals' : 'None'}</option>
+            {activeGoals.map((g) => (
               <option key={g.id} value={g.id}>
                 {g.pillarEmoji ? `${g.pillarEmoji} ` : ''}{g.name} ({g.goalType})
               </option>
@@ -357,6 +368,20 @@ export default function TaskForm({
             className="w-full px-3 py-2 border border-zinc-300 dark:border-zinc-600 rounded-lg bg-white dark:bg-zinc-700 text-zinc-900 dark:text-white"
           />
         </div>
+        {form.frequencyPreset !== 'adhoc' && (
+          <div>
+            <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">
+              End Date <span className="text-zinc-400 font-normal">(optional)</span>
+            </label>
+            <input
+              type="date"
+              value={form.endDate}
+              onChange={(e) => setForm({ ...form, endDate: e.target.value })}
+              min={form.startDate || undefined}
+              className="w-full px-3 py-2 border border-zinc-300 dark:border-zinc-600 rounded-lg bg-white dark:bg-zinc-700 text-zinc-900 dark:text-white"
+            />
+          </div>
+        )}
       </div>
 
       {/* Completion Type + Repeat */}

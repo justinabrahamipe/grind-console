@@ -101,6 +101,7 @@ async function _ensureUpcomingTasksInner(userId: string, todayStr: string) {
 
     // For recurring schedules, check each date in the range
     for (const dateStr of dates) {
+      if (schedule.endDate && dateStr > schedule.endDate) continue;
       if (existingSet.has(`${schedule.id}:${dateStr}`)) continue;
       if (isScheduleForExactDate(schedule, dateStr)) {
         taskValues.push(buildTaskFromSchedule(schedule, dateStr, userId));
