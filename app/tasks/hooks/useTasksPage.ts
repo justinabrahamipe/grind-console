@@ -338,6 +338,9 @@ export function useTasksPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filters.date.type, filters.date.value]);
 
+  const userId = session?.user?.id;
+  const initialFetchDone = useRef(false);
+
   useEffect(() => {
     if (status === "unauthenticated") {
       setPillars(DEMO_PILLARS.map(p => ({ id: p.id, name: p.name, emoji: p.emoji, color: p.color })));
@@ -350,9 +353,13 @@ export function useTasksPage() {
         })),
       })) as TaskGroup[]);
       setLoading(false);
+      initialFetchDone.current = false;
       return;
     }
-    if (session?.user?.id) {
+    if (userId) {
+      // Skip refetch on remount if we already have cached data
+      if (initialFetchDone.current && groups.length > 0) return;
+      initialFetchDone.current = true;
       fetchPillars();
       fetchOutcomes();
       fetchCycles();
@@ -370,7 +377,7 @@ export function useTasksPage() {
       }
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [session, status]);
+  }, [userId, status]);
 
   const fetchPillars = async () => {
     try {
@@ -421,8 +428,6 @@ export function useTasksPage() {
   const fetchTasks = async () => {
     try {
       if (!loading) setRefreshing(true);
-      setGroups([]);
-      setNoDateTasks([]);
       const url = `/api/tasks?date=${today}&all=true`;
       const res = await fetch(url);
       if (res.ok) {
@@ -473,8 +478,6 @@ export function useTasksPage() {
   const fetchDateTasks = async (date: string) => {
     try {
       if (!loading) setRefreshing(true);
-      setGroups([]);
-      setNoDateTasks([]);
       const res = await fetch(`/api/tasks?date=${date}`);
       if (res.ok) {
         const data = await res.json();
