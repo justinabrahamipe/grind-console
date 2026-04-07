@@ -3,7 +3,7 @@ import { eq, and } from "drizzle-orm";
 import { getTodayString, parseScheduleDays } from "@/lib/format";
 import { createAutoLog } from "@/lib/auto-log";
 import { generateGoalTasks } from "@/lib/ensure-upcoming-tasks";
-import { deleteFutureUncompletedTasks, deleteTasksBeyondDate, deleteTasksOnRemovedDays, regenerateGoalTasksIfNeeded } from "@/lib/goal-mutations";
+import { deleteFutureUncompletedTasks, deleteTasksBeyondDate, deleteTasksBeforeDate, deleteTasksOnRemovedDays, regenerateGoalTasksIfNeeded } from "@/lib/goal-mutations";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function handleCreateGoal(args: any, userId: string): Promise<string> {
@@ -112,6 +112,11 @@ export async function handleEditGoal(args: any, userId: string): Promise<string>
   // When targetDate is preponed, delete uncompleted tasks beyond the new end date
   if (args.targetDate !== undefined && args.targetDate) {
     await deleteTasksBeyondDate(goalId, userId, args.targetDate);
+  }
+
+  // When startDate is postponed, delete uncompleted tasks before the new start date
+  if (args.startDate !== undefined && args.startDate) {
+    await deleteTasksBeforeDate(goalId, userId, args.startDate);
   }
 
   // When scheduleDays changed, delete uncompleted future tasks on removed days

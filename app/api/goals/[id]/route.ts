@@ -4,7 +4,7 @@ import { db, goals, tasks, taskSchedules } from "@/lib/db";
 import { eq, and } from "drizzle-orm";
 import { createAutoLog } from "@/lib/auto-log";
 import { getTodayString, parseScheduleDays } from "@/lib/format";
-import { deleteFutureUncompletedTasks, deleteTasksBeyondDate, deleteTasksOnRemovedDays, regenerateGoalTasksIfNeeded } from "@/lib/goal-mutations";
+import { deleteFutureUncompletedTasks, deleteTasksBeyondDate, deleteTasksBeforeDate, deleteTasksOnRemovedDays, regenerateGoalTasksIfNeeded } from "@/lib/goal-mutations";
 
 export async function PUT(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -66,6 +66,11 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
     // When targetDate is preponed, delete uncompleted tasks beyond the new end date
     if (body.targetDate !== undefined && body.targetDate) {
       await deleteTasksBeyondDate(outcomeId, userId, body.targetDate);
+    }
+
+    // When startDate is postponed, delete uncompleted tasks before the new start date
+    if (body.startDate !== undefined && body.startDate) {
+      await deleteTasksBeforeDate(outcomeId, userId, body.startDate);
     }
 
     // When scheduleDays changed, delete uncompleted future tasks on removed days

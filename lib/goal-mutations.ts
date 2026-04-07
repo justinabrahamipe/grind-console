@@ -31,6 +31,19 @@ export async function deleteTasksBeyondDate(goalId: number, userId: string, targ
   await deleteTasksByIds(beyondIds);
 }
 
+export async function deleteTasksBeforeDate(goalId: number, userId: string, targetDate: string): Promise<void> {
+  const allTasks = await db
+    .select({ id: tasks.id, date: tasks.date })
+    .from(tasks)
+    .where(and(
+      eq(tasks.goalId, goalId),
+      eq(tasks.userId, userId),
+      eq(tasks.completed, false),
+    ));
+  const ids = allTasks.filter(t => t.date < targetDate).map(t => t.id);
+  await deleteTasksByIds(ids);
+}
+
 export async function deleteTasksOnRemovedDays(goalId: number, userId: string, oldScheduleDays: number[], newScheduleDays: number[]): Promise<void> {
   const removedDays = oldScheduleDays.filter(d => !newScheduleDays.includes(d));
   if (removedDays.length === 0) return;
