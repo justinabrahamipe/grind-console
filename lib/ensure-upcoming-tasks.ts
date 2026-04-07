@@ -133,6 +133,41 @@ async function _ensureUpcomingTasksInner(userId: string, todayStr: string) {
 }
 
 /**
+ * Delete uncompleted tasks for a goal that fall outside its current
+ * [startDate, targetDate] range or on weekdays no longer in scheduleDays.
+ * Safe to call regardless of autoCreateTasks/status.
+ */
+export async function cleanupStaleGoalTasks(userId: string, goalId: number) {
+  const [outcome] = await db
+    .select()
+    .from(goals)
+    .where(and(eq(goals.id, goalId), eq(goals.userId, userId)));
+  if (!outcome) return;
+
+  const scheduleDays: number[] = parseScheduleDays(outcome.scheduleDays);
+  const allGoalTasks = await db
+    .select({ id: tasks.id, date: tasks.date })
+    .from(tasks)
+    .where(and(
+      eq(tasks.goalId, goalId),
+      eq(tasks.userId, userId),
+      eq(tasks.completed, false),
+    ));
+  const staleIds: number[] = [];
+  for (const t of allGoalTasks) {
+    if (outcome.startDate && t.date < outcome.startDate) { staleIds.push(t.id); continue; }
+    if (outcome.targetDate && t.date > outcome.targetDate) { staleIds.push(t.id); continue; }
+    if (scheduleDays.length > 0) {
+      const dow = new Date(t.date + 'T12:00:00').getDay();
+      if (!scheduleDays.includes(dow)) { staleIds.push(t.id); continue; }
+    }
+  }
+  if (staleIds.length > 0) {
+    await db.delete(tasks).where(inArray(tasks.id, staleIds));
+  }
+}
+
+/**
  * Generate all task instances for a single goal across its full date range.
  * Called when a goal is created or edited (event-driven, not lazy).
  * Skips dates that already have tasks (dedup via originalDate).
@@ -149,6 +184,9 @@ export async function generateGoalTasks(userId: string, goalId: number) {
   if (scheduleDays.length === 0) return;
 
   const todayStr = getTodayString();
+
+  // Prune tasks that no longer fit the goal's current range/schedule
+  await cleanupStaleGoalTasks(userId, goalId);
 
   // Get existing tasks to avoid duplicates
   const existingGoalTasks = await db

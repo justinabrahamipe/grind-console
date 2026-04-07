@@ -1,10 +1,14 @@
-import { db, tasks, taskSchedules, pillars, goals } from "@/lib/db";
-import { eq, and, gt, or } from "drizzle-orm";
-import { getTodayString, getYesterdayString } from "@/lib/format";
+import { db, tasks, taskSchedules } from "@/lib/db";
+import { eq } from "drizzle-orm";
+import { getTodayString } from "@/lib/format";
 import { createAutoLog } from "@/lib/auto-log";
-import { saveDailyScore } from "@/lib/save-daily-score";
+import { saveDailyScore, recalculateDateScores } from "@/lib/save-daily-score";
 import { ensureUpcomingTasks, invalidateTaskCache } from "@/lib/ensure-upcoming-tasks";
 import { completeTask } from "@/lib/complete-task";
+import { getOwnedTask, getOwnedPillar, getOwnedGoal } from "@/lib/db-utils";
+import { mapTaskUpdateFields, mapScheduleUpdateFields } from "@/lib/task-utils";
+import { isTaskTooOldToEdit, dismissOrDeleteTask } from "@/lib/task-mutations";
+import { recalculateGoalCurrentValue } from "@/lib/goal-mutations";
 
 const DAY_MAP: Record<string, number> = { sun: 0, mon: 1, tue: 2, wed: 3, thu: 4, fri: 5, sat: 6 };
 
@@ -25,11 +29,11 @@ export async function handleCompleteTask(args: any, userId: string): Promise<str
   const taskId = parseInt(args.taskId);
   if (!taskId) return "Error: taskId is required.";
 
-  const [task] = await db.select().from(tasks).where(and(eq(tasks.id, taskId), eq(tasks.userId, userId)));
+  const task = await getOwnedTask(taskId, userId);
   if (!task) return "Error: Task not found.";
 
   // Only allow changes for today, yesterday, and future
-  if (task.date < getYesterdayString()) {
+  if (isTaskTooOldToEdit(task.date)) {
     return "Error: Cannot modify tasks older than yesterday.";
   }
 
@@ -62,7 +66,7 @@ export async function handleCreateTask(args: any, userId: string): Promise<strin
   const pillarId = args.pillarId ? parseInt(args.pillarId) : null;
 
   if (pillarId) {
-    const [p] = await db.select().from(pillars).where(and(eq(pillars.id, pillarId), eq(pillars.userId, userId)));
+    const p = await getOwnedPillar(pillarId, userId);
     if (!p) return "Error: Pillar not found.";
   }
 
@@ -73,7 +77,7 @@ export async function handleCreateTask(args: any, userId: string): Promise<strin
   let goalPillarId = pillarId;
   let goalPeriodId = args.periodId ? parseInt(args.periodId) : null;
   if (goalId) {
-    const [goal] = await db.select().from(goals).where(and(eq(goals.id, goalId), eq(goals.userId, userId)));
+    const goal = await getOwnedGoal(goalId, userId);
     if (!goal) return "Error: Goal not found.";
     goalStartDate = goal.startDate;
     goalEndDate = goal.targetDate;
@@ -134,63 +138,31 @@ export async function handleEditTask(args: any, userId: string): Promise<string>
   const taskId = parseInt(args.taskId);
   if (!taskId) return "Error: taskId is required.";
 
-  const [task] = await db.select().from(tasks).where(and(eq(tasks.id, taskId), eq(tasks.userId, userId)));
+  const task = await getOwnedTask(taskId, userId);
   if (!task) return "Error: Task not found.";
 
   // Only allow edits for today, yesterday, and future
-  const yesterdayStr = getYesterdayString();
-  if (task.date < yesterdayStr) {
+  if (isTaskTooOldToEdit(task.date)) {
     return "Error: Cannot modify tasks older than yesterday.";
   }
 
-  const updateData: Record<string, unknown> = {};
-  if (args.name !== undefined) updateData.name = args.name;
-  if (args.pillarId !== undefined) updateData.pillarId = args.pillarId || null;
-  if (args.completionType !== undefined) updateData.completionType = args.completionType;
-  if (args.target !== undefined) updateData.target = args.target;
-  if (args.unit !== undefined) updateData.unit = args.unit || null;
-  if (args.basePoints !== undefined) updateData.basePoints = args.basePoints;
-  if (args.date !== undefined) updateData.date = args.date;
-  if (args.goalId !== undefined) updateData.goalId = args.goalId === 0 ? null : args.goalId;
-  if (args.flexibilityRule !== undefined) updateData.flexibilityRule = args.flexibilityRule;
-  if (args.limitValue !== undefined) updateData.limitValue = args.limitValue ?? null;
-  if (args.periodId !== undefined) updateData.periodId = args.periodId === 0 ? null : args.periodId;
-  if (args.description !== undefined) updateData.description = args.description || null;
-
-  // Clear highlight when date is removed
-  if (args.date === '' || args.date === null) {
-    updateData.isHighlighted = false;
-  }
-
+  const updateData = mapTaskUpdateFields(args);
   if (Object.keys(updateData).length === 0) return "Error: No fields to update.";
 
   await db.update(tasks).set(updateData).where(eq(tasks.id, taskId));
 
-  // Propagate to schedule if linked
+  // Propagate to schedule if linked. Schedules use startDate; map task.date → startDate.
   if (task.scheduleId) {
-    const scheduleUpdate: Record<string, unknown> = {};
-    if (args.name !== undefined) scheduleUpdate.name = args.name;
-    if (args.pillarId !== undefined) scheduleUpdate.pillarId = args.pillarId || null;
-    if (args.completionType !== undefined) scheduleUpdate.completionType = args.completionType;
-    if (args.target !== undefined) scheduleUpdate.target = args.target;
-    if (args.unit !== undefined) scheduleUpdate.unit = args.unit || null;
-    if (args.basePoints !== undefined) scheduleUpdate.basePoints = args.basePoints;
-    if (args.date !== undefined) scheduleUpdate.startDate = args.date;
-    if (args.goalId !== undefined) scheduleUpdate.goalId = args.goalId === 0 ? null : args.goalId;
-    if (args.periodId !== undefined) scheduleUpdate.periodId = args.periodId === 0 ? null : args.periodId;
-    if (args.flexibilityRule !== undefined) scheduleUpdate.flexibilityRule = args.flexibilityRule;
-    if (args.limitValue !== undefined) scheduleUpdate.limitValue = args.limitValue ?? null;
-    if (args.description !== undefined) scheduleUpdate.description = args.description || null;
-    if (args.endDate !== undefined) scheduleUpdate.endDate = args.endDate || null;
+    const scheduleSrc = { ...args, startDate: args.date !== undefined ? args.date : args.startDate };
+    const scheduleUpdate = mapScheduleUpdateFields(scheduleSrc);
     if (Object.keys(scheduleUpdate).length > 0) {
       await db.update(taskSchedules).set(scheduleUpdate).where(eq(taskSchedules.id, task.scheduleId));
     }
   }
 
   // Recalculate scores if date changed
-  if (args.date !== undefined && task.date && args.date !== task.date) {
-    await saveDailyScore(userId, task.date);
-    if (args.date) await saveDailyScore(userId, args.date);
+  if (args.date !== undefined) {
+    await recalculateDateScores(userId, task.date, args.date);
   }
 
   await createAutoLog(userId, `✏️ Task updated: ${args.name || task.name}`);
@@ -202,25 +174,14 @@ export async function handleDeleteTask(args: any, userId: string): Promise<strin
   const taskId = parseInt(args.taskId);
   if (!taskId) return "Error: taskId is required.";
 
-  const [task] = await db.select().from(tasks).where(and(eq(tasks.id, taskId), eq(tasks.userId, userId)));
+  const task = await getOwnedTask(taskId, userId);
   if (!task) return "Error: Task not found.";
 
-  if (task.goalId || task.scheduleId) {
-    // Goal-linked or schedule-linked: dismiss instead of delete to prevent auto-recreation
-    await db.update(tasks).set({ dismissed: true, completed: false, value: null, pointsEarned: 0 }).where(eq(tasks.id, taskId));
-  } else {
-    await db.delete(tasks).where(and(eq(tasks.id, taskId), eq(tasks.userId, userId)));
-  }
+  await dismissOrDeleteTask(taskId, userId, task.goalId, task.scheduleId);
 
   // Recalculate linked goal if task had progress
   if (task.goalId && (task.completed || (task.value ?? 0) > 0)) {
-    const [linkedGoal] = await db.select().from(goals).where(and(eq(goals.id, task.goalId), eq(goals.userId, userId)));
-    if (linkedGoal && linkedGoal.goalType !== 'outcome') {
-      const remaining = await db.select({ value: tasks.value }).from(tasks)
-        .where(and(eq(tasks.goalId, task.goalId), eq(tasks.dismissed, false), or(eq(tasks.completed, true), gt(tasks.value, 0))));
-      const newTotal = remaining.reduce((sum, t) => sum + (t.value ?? 0), 0);
-      await db.update(goals).set({ currentValue: newTotal }).where(eq(goals.id, linkedGoal.id));
-    }
+    await recalculateGoalCurrentValue(task.goalId, userId);
   }
 
   // Recalculate daily score

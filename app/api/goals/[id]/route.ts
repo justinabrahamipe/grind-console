@@ -2,9 +2,11 @@ import { NextResponse } from "next/server";
 import { getAuthenticatedUserId, errorResponse } from "@/lib/api-utils";
 import { db, goals, tasks, taskSchedules } from "@/lib/db";
 import { eq, and } from "drizzle-orm";
-import { createAutoLog } from "@/lib/auto-log";
-import { getTodayString, parseScheduleDays } from "@/lib/format";
-import { deleteFutureUncompletedTasks, deleteTasksBeyondDate, deleteTasksBeforeDate, deleteTasksOnRemovedDays, regenerateGoalTasksIfNeeded } from "@/lib/goal-mutations";
+import { createAutoLog, logGoalStatusChange } from "@/lib/auto-log";
+import { getTodayString } from "@/lib/format";
+import { deleteFutureUncompletedTasks, regenerateGoalTasksIfNeeded } from "@/lib/goal-mutations";
+import { getOwnedGoal } from "@/lib/db-utils";
+import { mapGoalUpdateFields, buildGoalPropagationPair } from "@/lib/goal-utils";
 
 export async function PUT(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -14,40 +16,16 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
     const outcomeId = parseInt(id);
     const body = await request.json();
 
-    const existing = await db
-      .select()
-      .from(goals)
-      .where(and(eq(goals.id, outcomeId), eq(goals.userId, userId)));
-
-    if (existing.length === 0) {
+    const existing = await getOwnedGoal(outcomeId, userId);
+    if (!existing) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
 
-    const updateData: Record<string, unknown> = {};
-    if (body.name !== undefined) updateData.name = body.name;
-    if (body.pillarId !== undefined) updateData.pillarId = body.pillarId || null;
-    if (body.startValue !== undefined) updateData.startValue = body.startValue;
-    if (body.targetValue !== undefined) updateData.targetValue = body.targetValue;
-    if (body.unit !== undefined) updateData.unit = body.unit;
-    if (body.startDate !== undefined) updateData.startDate = body.startDate || null;
-    if (body.targetDate !== undefined) updateData.targetDate = body.targetDate || null;
-    if (body.periodId !== undefined) updateData.periodId = body.periodId || null;
-    if (body.goalType !== undefined) updateData.goalType = body.goalType;
-    if (body.scheduleDays !== undefined) updateData.scheduleDays = body.scheduleDays ? JSON.stringify(body.scheduleDays) : null;
-    if (body.autoCreateTasks !== undefined) updateData.autoCreateTasks = body.autoCreateTasks;
-    if (body.completionType !== undefined) updateData.completionType = body.completionType;
-    if (body.dailyTarget !== undefined) updateData.dailyTarget = body.dailyTarget ?? null;
-    if (body.flexibilityRule !== undefined) updateData.flexibilityRule = body.flexibilityRule;
-    if (body.limitValue !== undefined) updateData.limitValue = body.limitValue ?? null;
-    if (body.basePoints !== undefined) updateData.basePoints = body.basePoints ?? 10;
-    if (body.status !== undefined) updateData.status = body.status;
+    const updateData = mapGoalUpdateFields(body);
 
     // When marking a target/outcome goal as complete, set currentValue = targetValue
-    if (body.status === 'completed') {
-      const goal = existing[0];
-      if (goal.goalType === 'target' || goal.goalType === 'outcome') {
-        updateData.currentValue = goal.targetValue;
-      }
+    if (body.status === 'completed' && (existing.goalType === 'target' || existing.goalType === 'outcome')) {
+      updateData.currentValue = existing.targetValue;
     }
 
     const [updated] = await db
@@ -58,48 +36,19 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
 
     const todayStr = getTodayString();
 
-    // When goal is completed or abandoned, delete future uncompleted tasks
+    // When goal is completed/abandoned, or autoCreateTasks is turned off, delete future uncompleted tasks
     if (body.status === 'completed' || body.status === 'abandoned') {
       await deleteFutureUncompletedTasks(outcomeId, userId);
     }
-
-    // When targetDate is preponed, delete uncompleted tasks beyond the new end date
-    if (body.targetDate !== undefined && body.targetDate) {
-      await deleteTasksBeyondDate(outcomeId, userId, body.targetDate);
-    }
-
-    // When startDate is postponed, delete uncompleted tasks before the new start date
-    if (body.startDate !== undefined && body.startDate) {
-      await deleteTasksBeforeDate(outcomeId, userId, body.startDate);
-    }
-
-    // When scheduleDays changed, delete uncompleted future tasks on removed days
-    if (body.scheduleDays !== undefined) {
-      const newDays: number[] = body.scheduleDays || [];
-      const oldDays: number[] = parseScheduleDays(existing[0].scheduleDays);
-      await deleteTasksOnRemovedDays(outcomeId, userId, oldDays, newDays);
-    }
-
-    // When autoCreateTasks is turned off, delete all future uncompleted tasks
-    if (body.autoCreateTasks === false && existing[0].autoCreateTasks) {
+    if (body.autoCreateTasks === false && existing.autoCreateTasks) {
       await deleteFutureUncompletedTasks(outcomeId, userId);
     }
 
-    // Generate new tasks for extended range, new days, or toggled-on autoCreateTasks
-    await regenerateGoalTasksIfNeeded(outcomeId, userId, existing[0], body, updated);
+    // Prune stale tasks and (re)generate for range/schedule changes
+    await regenerateGoalTasksIfNeeded(outcomeId, userId, existing, body, updated);
 
     // Propagate changes to linked uncompleted tasks and their schedules
-    const propagateToTasks: Record<string, unknown> = {};
-    const propagateToSchedules: Record<string, unknown> = {};
-    if (body.name !== undefined) { propagateToTasks.name = body.name; propagateToSchedules.name = body.name; }
-    if (body.pillarId !== undefined) { propagateToTasks.pillarId = body.pillarId || null; propagateToSchedules.pillarId = body.pillarId || null; }
-    if (body.completionType !== undefined) { propagateToTasks.completionType = body.completionType; propagateToSchedules.completionType = body.completionType; }
-    if (body.unit !== undefined) { propagateToTasks.unit = body.unit || null; propagateToSchedules.unit = body.unit || null; }
-    if (body.flexibilityRule !== undefined) { propagateToTasks.flexibilityRule = body.flexibilityRule; propagateToSchedules.flexibilityRule = body.flexibilityRule; }
-    if (body.limitValue !== undefined) { propagateToTasks.limitValue = body.limitValue ?? null; propagateToSchedules.limitValue = body.limitValue ?? null; }
-    if (body.dailyTarget !== undefined) { propagateToTasks.target = body.dailyTarget; propagateToSchedules.target = body.dailyTarget; }
-    if (body.basePoints !== undefined) { propagateToTasks.basePoints = body.basePoints ?? 10; propagateToSchedules.basePoints = body.basePoints ?? 10; }
-    if (body.periodId !== undefined) { propagateToTasks.periodId = body.periodId || null; propagateToSchedules.periodId = body.periodId || null; }
+    const { tasks: propagateToTasks, schedules: propagateToSchedules } = buildGoalPropagationPair(body);
 
     if (Object.keys(propagateToTasks).length > 0) {
       const linkedTasks = await db
@@ -121,19 +70,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
         .where(and(eq(taskSchedules.goalId, outcomeId), eq(taskSchedules.userId, userId)));
     }
 
-    // Auto-log goal changes
-    const goalName = existing[0].name;
-    if (body.status === 'completed') {
-      await createAutoLog(userId, `🏆 Goal completed: ${goalName}`);
-    } else if (body.status === 'abandoned') {
-      await createAutoLog(userId, `🚫 Goal abandoned: ${goalName}`);
-    } else if (body.status === 'active' && existing[0].status !== 'active') {
-      await createAutoLog(userId, `🔄 Goal reactivated: ${goalName}`);
-    } else if (body.name && body.name !== goalName) {
-      await createAutoLog(userId, `✏️ Goal renamed: ${goalName} → ${body.name}`);
-    } else if (Object.keys(body).some(k => !['status'].includes(k))) {
-      await createAutoLog(userId, `✏️ Goal updated: ${goalName}`);
-    }
+    await logGoalStatusChange(userId, existing, body);
 
     return NextResponse.json(updated);
   } catch (error) {

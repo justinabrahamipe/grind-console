@@ -3,6 +3,8 @@ import { getAuthenticatedUserId, errorResponse } from "@/lib/api-utils";
 import { db, pillars } from "@/lib/db";
 import { eq, and } from "drizzle-orm";
 import { createAutoLog } from "@/lib/auto-log";
+import { getOwnedPillar } from "@/lib/db-utils";
+import { mapPillarUpdateFields } from "@/lib/task-utils";
 
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -11,11 +13,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     const { id } = await params;
     const pillarId = parseInt(id);
 
-    const [pillar] = await db
-      .select()
-      .from(pillars)
-      .where(and(eq(pillars.id, pillarId), eq(pillars.userId, userId)));
-
+    const pillar = await getOwnedPillar(pillarId, userId);
     if (!pillar) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
@@ -34,28 +32,19 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
     const pillarId = parseInt(id);
     const body = await request.json();
 
-    const existing = await db
-      .select()
-      .from(pillars)
-      .where(and(eq(pillars.id, pillarId), eq(pillars.userId, userId)));
-
-    if (existing.length === 0) {
+    const existing = await getOwnedPillar(pillarId, userId);
+    if (!existing) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
 
-    const updateData: Record<string, unknown> = {};
-    if (body.name !== undefined) updateData.name = body.name;
-    if (body.emoji !== undefined) updateData.emoji = body.emoji;
-    if (body.color !== undefined) updateData.color = body.color;
-    if (body.defaultBasePoints !== undefined) updateData.defaultBasePoints = body.defaultBasePoints;
-    if (body.description !== undefined) updateData.description = body.description;
+    const updateData = mapPillarUpdateFields(body);
     const [updated] = await db
       .update(pillars)
       .set(updateData)
       .where(and(eq(pillars.id, pillarId), eq(pillars.userId, userId)))
       .returning();
 
-    await createAutoLog(userId, `✏️ Pillar updated: ${existing[0].name}`);
+    await createAutoLog(userId, `✏️ Pillar updated: ${existing.name}`);
     return NextResponse.json(updated);
   } catch (error) {
     return errorResponse(error);

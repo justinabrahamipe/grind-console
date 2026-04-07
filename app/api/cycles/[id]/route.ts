@@ -5,6 +5,8 @@ import { eq, and } from "drizzle-orm";
 import { calculateEndDate } from "@/lib/cycle-scoring";
 import { getTodayString } from "@/lib/format";
 import { createAutoLog } from "@/lib/auto-log";
+import { getOwnedCycle } from "@/lib/db-utils";
+import { mapCycleUpdateFields } from "@/lib/task-utils";
 
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -13,11 +15,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     const { id } = await params;
     const periodId = parseInt(id);
 
-    const [cycle] = await db
-      .select()
-      .from(cycles)
-      .where(and(eq(cycles.id, periodId), eq(cycles.userId, userId)));
-
+    const cycle = await getOwnedCycle(periodId, userId);
     if (!cycle) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
@@ -79,24 +77,16 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
     const periodId = parseInt(id);
     const body = await request.json();
 
-    const existing = await db
-      .select()
-      .from(cycles)
-      .where(and(eq(cycles.id, periodId), eq(cycles.userId, userId)));
-
-    if (existing.length === 0) {
+    const existing = await getOwnedCycle(periodId, userId);
+    if (!existing) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
 
-    const updateData: Record<string, unknown> = { updatedAt: new Date() };
-    if (body.name !== undefined) updateData.name = body.name;
-    if (body.startDate !== undefined) {
-      updateData.startDate = body.startDate;
-      if (!body.endDate) updateData.endDate = calculateEndDate(body.startDate);
+    const updateData: Record<string, unknown> = { ...mapCycleUpdateFields(body), updatedAt: new Date() };
+    // Auto-derive endDate from startDate when only startDate is provided
+    if (body.startDate !== undefined && !body.endDate) {
+      updateData.endDate = calculateEndDate(body.startDate);
     }
-    if (body.endDate !== undefined) updateData.endDate = body.endDate;
-    if (body.vision !== undefined) updateData.vision = body.vision || null;
-    if (body.theme !== undefined) updateData.theme = body.theme || null;
 
     const [updated] = await db
       .update(cycles)
@@ -104,7 +94,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
       .where(and(eq(cycles.id, periodId), eq(cycles.userId, userId)))
       .returning();
 
-    await createAutoLog(userId, `✏️ Cycle updated: ${existing[0].name}`);
+    await createAutoLog(userId, `✏️ Cycle updated: ${existing.name}`);
     const todayStr = getTodayString();
     return NextResponse.json({
       ...updated,

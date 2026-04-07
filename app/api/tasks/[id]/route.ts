@@ -1,11 +1,15 @@
 import { NextResponse } from "next/server";
 import { getAuthenticatedUserId, errorResponse } from "@/lib/api-utils";
-import { db, tasks, taskSchedules, goals } from "@/lib/db";
+import { db, tasks, taskSchedules } from "@/lib/db";
 import { invalidateTaskCache } from "@/lib/ensure-upcoming-tasks";
-import { eq, and, or, gt } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import { createAutoLog } from "@/lib/auto-log";
-import { saveDailyScore } from "@/lib/save-daily-score";
+import { recalculateDateScores } from "@/lib/save-daily-score";
 import { getTodayString } from "@/lib/format";
+import { getOwnedTask, getOwnedSchedule } from "@/lib/db-utils";
+import { mapTaskUpdateFields, mapScheduleUpdateFields, buildTaskPropagationFields } from "@/lib/task-utils";
+import { isTaskTooOldToEdit, dismissOrDeleteTask } from "@/lib/task-mutations";
+import { recalculateGoalCurrentValue } from "@/lib/goal-mutations";
 
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -78,7 +82,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
 
     if (type === 'task') {
       // Update a specific task instance
-      const [existing] = await db.select().from(tasks).where(and(eq(tasks.id, itemId), eq(tasks.userId, userId)));
+      const existing = await getOwnedTask(itemId, userId);
       if (!existing) {
         return NextResponse.json({ error: "Not found" }, { status: 404 });
       }
@@ -86,22 +90,11 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
       // Only allow edits for today, yesterday, and future — older tasks are frozen (no-date tasks are always editable)
       // Use client-provided date to derive yesterday (avoids server timezone mismatch)
       const refDate = body.date || body.startDate || existing.date;
-      const clientYesterday = new Date((refDate || existing.date) + 'T12:00:00');
-      clientYesterday.setDate(clientYesterday.getDate() - 1);
-      if (existing.date !== '' && existing.date < clientYesterday.toISOString().split('T')[0]) {
+      if (isTaskTooOldToEdit(existing.date, refDate)) {
         return NextResponse.json({ error: "Cannot modify tasks older than yesterday" }, { status: 403 });
       }
 
-      const updateData: Record<string, unknown> = {};
-      const taskFields = ['name', 'pillarId', 'completionType', 'target', 'unit', 'basePoints', 'goalId', 'periodId', 'date', 'flexibilityRule', 'limitValue', 'description'];
-      for (const field of taskFields) {
-        if (body[field] !== undefined) updateData[field] = body[field];
-      }
-
-      // Clear highlight when date is removed
-      if (body.date === '' || body.date === null) {
-        updateData.isHighlighted = false;
-      }
+      const updateData = mapTaskUpdateFields(body);
 
       const [updated] = await db
         .update(tasks)
@@ -116,29 +109,18 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
     }
 
     // Default: update schedule and propagate to uncompleted future task instances
-    const existing = await db
-      .select()
-      .from(taskSchedules)
-      .where(and(eq(taskSchedules.id, itemId), eq(taskSchedules.userId, userId)));
+    const existing = await getOwnedSchedule(itemId, userId);
 
-    if (existing.length === 0) {
+    if (!existing) {
       // Try as task instance (adhoc tasks are stored directly without schedules)
-      const [taskInstance] = await db
-        .select()
-        .from(tasks)
-        .where(and(eq(tasks.id, itemId), eq(tasks.userId, userId)));
-
+      const taskInstance = await getOwnedTask(itemId, userId);
       if (!taskInstance) {
         return NextResponse.json({ error: "Not found" }, { status: 404 });
       }
 
-      // Update the task instance directly
-      const updateData: Record<string, unknown> = {};
-      if (body.startDate !== undefined) updateData.date = body.startDate || '';
-      const taskFields = ['name', 'pillarId', 'completionType', 'target', 'unit', 'basePoints', 'goalId', 'periodId', 'flexibilityRule', 'limitValue', 'description'];
-      for (const field of taskFields) {
-        if (body[field] !== undefined) updateData[field] = body[field];
-      }
+      // Update the task instance directly. body.startDate maps to task.date here.
+      const taskBody = { ...body, date: body.startDate !== undefined ? (body.startDate || '') : body.date };
+      const updateData = mapTaskUpdateFields(taskBody);
 
       const [updated] = await db
         .update(tasks)
@@ -147,20 +129,13 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
         .returning();
 
       // Recalculate scores for old and new date when task is moved
-      if (body.startDate !== undefined && taskInstance.date && body.startDate !== taskInstance.date) {
-        await saveDailyScore(userId, taskInstance.date); // old date
-        if (body.startDate) await saveDailyScore(userId, body.startDate); // new date
+      if (body.startDate !== undefined) {
+        await recalculateDateScores(userId, taskInstance.date, body.startDate);
       }
 
       // Also update the schedule if it exists
       if (taskInstance.scheduleId) {
-        const scheduleUpdate: Record<string, unknown> = {};
-        const scheduleFields = ['name', 'pillarId', 'completionType', 'target', 'unit', 'flexibilityRule', 'frequency', 'customDays', 'repeatInterval', 'basePoints', 'limitValue', 'goalId', 'periodId', 'description'];
-        for (const field of scheduleFields) {
-          if (body[field] !== undefined) scheduleUpdate[field] = body[field];
-        }
-        if (body.startDate !== undefined) scheduleUpdate.startDate = body.startDate;
-        if (body.endDate !== undefined) scheduleUpdate.endDate = body.endDate;
+        const scheduleUpdate = mapScheduleUpdateFields(body);
         if (Object.keys(scheduleUpdate).length > 0) {
           await db.update(taskSchedules).set(scheduleUpdate)
             .where(eq(taskSchedules.id, taskInstance.scheduleId));
@@ -170,14 +145,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
       return NextResponse.json(updated);
     }
 
-    const updateData: Record<string, unknown> = {};
-    const fields = ['name', 'pillarId', 'completionType', 'target', 'unit', 'flexibilityRule', 'frequency', 'customDays', 'repeatInterval', 'basePoints', 'limitValue', 'goalId', 'periodId', 'startDate', 'endDate', 'description'];
-
-    for (const field of fields) {
-      if (body[field] !== undefined) {
-        updateData[field] = body[field];
-      }
-    }
+    const updateData = mapScheduleUpdateFields(body);
 
     const [updated] = await db
       .update(taskSchedules)
@@ -185,12 +153,9 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
       .where(and(eq(taskSchedules.id, itemId), eq(taskSchedules.userId, userId)))
       .returning();
 
-    // Propagate name/pillar/completionType changes to uncompleted future task instances
+    // Propagate to uncompleted future task instances
     const todayStr = getTodayString();
-    const propagateFields: Record<string, unknown> = {};
-    for (const field of ['name', 'pillarId', 'completionType', 'target', 'unit', 'basePoints', 'flexibilityRule', 'limitValue']) {
-      if (body[field] !== undefined) propagateFields[field] = body[field];
-    }
+    const propagateFields = buildTaskPropagationFields(body);
     if (Object.keys(propagateFields).length > 0) {
       // Update future uncompleted task instances
       const futureTasks = await db
@@ -233,51 +198,17 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
     }
 
     // Try as task instance
-    const [taskInstance] = await db
-      .select()
-      .from(tasks)
-      .where(and(eq(tasks.id, itemId), eq(tasks.userId, userId)));
-
+    const taskInstance = await getOwnedTask(itemId, userId);
     if (!taskInstance) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
 
     await createAutoLog(userId, `🗑️ Task deleted: ${taskInstance.name}`);
-
-    // For goal-linked or schedule-linked tasks, mark as dismissed instead of deleting (prevents auto-recreation)
-    if (taskInstance.goalId || taskInstance.scheduleId) {
-      await db
-        .update(tasks)
-        .set({ dismissed: true, completed: false, value: null, pointsEarned: 0 })
-        .where(eq(tasks.id, itemId));
-    } else {
-      await db
-        .delete(tasks)
-        .where(and(eq(tasks.id, itemId), eq(tasks.userId, userId)));
-    }
+    await dismissOrDeleteTask(itemId, userId, taskInstance.goalId, taskInstance.scheduleId);
 
     // Recalculate linked goal's currentValue after task deletion
     if (taskInstance.goalId && (taskInstance.completed || (taskInstance.value ?? 0) > 0)) {
-      try {
-        const [linkedGoal] = await db
-          .select()
-          .from(goals)
-          .where(and(eq(goals.id, taskInstance.goalId), eq(goals.userId, userId)));
-
-        if (linkedGoal && linkedGoal.goalType !== 'outcome') {
-          const remaining = await db
-            .select({ value: tasks.value })
-            .from(tasks)
-            .where(and(eq(tasks.goalId, taskInstance.goalId), eq(tasks.dismissed, false), or(eq(tasks.completed, true), gt(tasks.value, 0))));
-          const newTotal = remaining.reduce((sum, t) => sum + (t.value ?? 0), 0);
-          await db
-            .update(goals)
-            .set({ currentValue: newTotal })
-            .where(eq(goals.id, linkedGoal.id));
-        }
-      } catch (err) {
-        console.error("Failed to recalculate goal after task deletion:", err);
-      }
+      await recalculateGoalCurrentValue(taskInstance.goalId, userId);
     }
 
     return NextResponse.json({ success: true });

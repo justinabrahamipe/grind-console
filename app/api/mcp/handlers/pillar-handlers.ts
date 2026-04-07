@@ -2,6 +2,8 @@ import { db, pillars, cycles, locationLogs } from "@/lib/db";
 import { eq, and } from "drizzle-orm";
 import { getTodayString } from "@/lib/format";
 import { createAutoLog } from "@/lib/auto-log";
+import { getOwnedPillar, getOwnedCycle } from "@/lib/db-utils";
+import { mapPillarUpdateFields, mapCycleUpdateFields } from "@/lib/task-utils";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function handleCreatePillar(args: any, userId: string): Promise<string> {
@@ -26,16 +28,10 @@ export async function handleEditPillar(args: any, userId: string): Promise<strin
   const pillarId = parseInt(args.pillarId);
   if (!pillarId) return "Error: pillarId is required.";
 
-  const [existing] = await db.select().from(pillars).where(and(eq(pillars.id, pillarId), eq(pillars.userId, userId)));
+  const existing = await getOwnedPillar(pillarId, userId);
   if (!existing) return "Error: Pillar not found.";
 
-  const updateData: Record<string, unknown> = {};
-  if (args.name !== undefined) updateData.name = args.name;
-  if (args.emoji !== undefined) updateData.emoji = args.emoji;
-  if (args.color !== undefined) updateData.color = args.color;
-  if (args.defaultBasePoints !== undefined) updateData.defaultBasePoints = args.defaultBasePoints;
-  if (args.description !== undefined) updateData.description = args.description || null;
-
+  const updateData = mapPillarUpdateFields(args);
   if (Object.keys(updateData).length === 0) return "Error: No fields to update.";
 
   await db.update(pillars).set(updateData).where(and(eq(pillars.id, pillarId), eq(pillars.userId, userId)));
@@ -66,16 +62,10 @@ export async function handleEditCycle(args: any, userId: string): Promise<string
   const cycleId = parseInt(args.cycleId);
   if (!cycleId) return "Error: cycleId is required.";
 
-  const [existing] = await db.select().from(cycles).where(and(eq(cycles.id, cycleId), eq(cycles.userId, userId)));
+  const existing = await getOwnedCycle(cycleId, userId);
   if (!existing) return "Error: Cycle not found.";
 
-  const updateData: Record<string, unknown> = {};
-  if (args.name !== undefined) updateData.name = args.name;
-  if (args.startDate !== undefined) updateData.startDate = args.startDate;
-  if (args.endDate !== undefined) updateData.endDate = args.endDate;
-  if (args.vision !== undefined) updateData.vision = args.vision || null;
-  if (args.theme !== undefined) updateData.theme = args.theme || null;
-
+  const updateData = mapCycleUpdateFields(args);
   if (Object.keys(updateData).length === 0) return "Error: No fields to update.";
 
   await db.update(cycles).set(updateData).where(and(eq(cycles.id, cycleId), eq(cycles.userId, userId)));
