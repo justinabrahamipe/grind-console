@@ -1,9 +1,11 @@
-import { db, goals, tasks, taskSchedules, pillars, cycles } from "@/lib/db";
+import { db, goals, tasks, taskSchedules, cycles } from "@/lib/db";
 import { eq, and } from "drizzle-orm";
-import { getTodayString, parseScheduleDays } from "@/lib/format";
-import { createAutoLog } from "@/lib/auto-log";
+import { getTodayString } from "@/lib/format";
+import { createAutoLog, logGoalStatusChange } from "@/lib/auto-log";
 import { generateGoalTasks } from "@/lib/ensure-upcoming-tasks";
-import { deleteFutureUncompletedTasks, deleteTasksBeyondDate, deleteTasksBeforeDate, deleteTasksOnRemovedDays, regenerateGoalTasksIfNeeded } from "@/lib/goal-mutations";
+import { deleteFutureUncompletedTasks, regenerateGoalTasksIfNeeded } from "@/lib/goal-mutations";
+import { getOwnedGoal, getOwnedPillar } from "@/lib/db-utils";
+import { mapGoalUpdateFields, buildGoalPropagationPair } from "@/lib/goal-utils";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function handleCreateGoal(args: any, userId: string): Promise<string> {
@@ -19,7 +21,7 @@ export async function handleCreateGoal(args: any, userId: string): Promise<strin
 
   const pillarId = args.pillarId ? parseInt(args.pillarId) : null;
   if (pillarId) {
-    const [p] = await db.select().from(pillars).where(and(eq(pillars.id, pillarId), eq(pillars.userId, userId)));
+    const p = await getOwnedPillar(pillarId, userId);
     if (!p) return "Error: Pillar not found.";
   }
 
@@ -73,28 +75,10 @@ export async function handleEditGoal(args: any, userId: string): Promise<string>
   const goalId = parseInt(args.goalId);
   if (!goalId) return "Error: goalId is required.";
 
-  const [existing] = await db.select().from(goals).where(and(eq(goals.id, goalId), eq(goals.userId, userId)));
+  const existing = await getOwnedGoal(goalId, userId);
   if (!existing) return "Error: Goal not found.";
 
-  const updateData: Record<string, unknown> = {};
-  if (args.name !== undefined) updateData.name = args.name;
-  if (args.pillarId !== undefined) updateData.pillarId = args.pillarId || null;
-  if (args.startValue !== undefined) updateData.startValue = args.startValue;
-  if (args.targetValue !== undefined) updateData.targetValue = args.targetValue;
-  if (args.unit !== undefined) updateData.unit = args.unit;
-  if (args.startDate !== undefined) updateData.startDate = args.startDate || null;
-  if (args.targetDate !== undefined) updateData.targetDate = args.targetDate || null;
-  if (args.status !== undefined) updateData.status = args.status;
-  if (args.periodId !== undefined) updateData.periodId = args.periodId === 0 ? null : args.periodId;
-  if (args.dailyTarget !== undefined) updateData.dailyTarget = args.dailyTarget ?? null;
-  if (args.completionType !== undefined) updateData.completionType = args.completionType;
-  if (args.goalType !== undefined) updateData.goalType = args.goalType;
-  if (args.scheduleDays !== undefined) updateData.scheduleDays = Array.isArray(args.scheduleDays) ? JSON.stringify(args.scheduleDays) : null;
-  if (args.autoCreateTasks !== undefined) updateData.autoCreateTasks = args.autoCreateTasks;
-  if (args.flexibilityRule !== undefined) updateData.flexibilityRule = args.flexibilityRule;
-  if (args.limitValue !== undefined) updateData.limitValue = args.limitValue ?? null;
-  if (args.basePoints !== undefined) updateData.basePoints = args.basePoints ?? 10;
-
+  const updateData = mapGoalUpdateFields(args);
   if (Object.keys(updateData).length === 0) return "Error: No fields to update.";
 
   // Auto-complete target/outcome goals when marked completed
@@ -109,43 +93,16 @@ export async function handleEditGoal(args: any, userId: string): Promise<string>
     await deleteFutureUncompletedTasks(goalId, userId);
   }
 
-  // When targetDate is preponed, delete uncompleted tasks beyond the new end date
-  if (args.targetDate !== undefined && args.targetDate) {
-    await deleteTasksBeyondDate(goalId, userId, args.targetDate);
-  }
-
-  // When startDate is postponed, delete uncompleted tasks before the new start date
-  if (args.startDate !== undefined && args.startDate) {
-    await deleteTasksBeforeDate(goalId, userId, args.startDate);
-  }
-
-  // When scheduleDays changed, delete uncompleted future tasks on removed days
-  if (args.scheduleDays !== undefined) {
-    const newDays: number[] = Array.isArray(args.scheduleDays) ? args.scheduleDays : [];
-    const oldDays: number[] = parseScheduleDays(existing.scheduleDays);
-    await deleteTasksOnRemovedDays(goalId, userId, oldDays, newDays);
-  }
-
   // When autoCreateTasks is turned off, delete future uncompleted tasks
   if (args.autoCreateTasks === false && existing.autoCreateTasks) {
     await deleteFutureUncompletedTasks(goalId, userId);
   }
 
-  // Generate new tasks for extended range, new days, or toggled-on autoCreateTasks
+  // Prune stale tasks and (re)generate for range/schedule changes
   await regenerateGoalTasksIfNeeded(goalId, userId, existing, args, null);
 
   // Propagate changes to linked uncompleted tasks and their schedules
-  const propagateToTasks: Record<string, unknown> = {};
-  const propagateToSchedules: Record<string, unknown> = {};
-  if (args.name !== undefined) { propagateToTasks.name = args.name; propagateToSchedules.name = args.name; }
-  if (args.pillarId !== undefined) { propagateToTasks.pillarId = args.pillarId || null; propagateToSchedules.pillarId = args.pillarId || null; }
-  if (args.completionType !== undefined) { propagateToTasks.completionType = args.completionType; propagateToSchedules.completionType = args.completionType; }
-  if (args.unit !== undefined) { propagateToTasks.unit = args.unit || null; propagateToSchedules.unit = args.unit || null; }
-  if (args.flexibilityRule !== undefined) { propagateToTasks.flexibilityRule = args.flexibilityRule; propagateToSchedules.flexibilityRule = args.flexibilityRule; }
-  if (args.limitValue !== undefined) { propagateToTasks.limitValue = args.limitValue ?? null; propagateToSchedules.limitValue = args.limitValue ?? null; }
-  if (args.dailyTarget !== undefined) { propagateToTasks.target = args.dailyTarget; propagateToSchedules.target = args.dailyTarget; }
-  if (args.basePoints !== undefined) { propagateToTasks.basePoints = args.basePoints ?? 10; propagateToSchedules.basePoints = args.basePoints ?? 10; }
-  if (args.periodId !== undefined) { propagateToTasks.periodId = args.periodId || null; propagateToSchedules.periodId = args.periodId || null; }
+  const { tasks: propagateToTasks, schedules: propagateToSchedules } = buildGoalPropagationPair(args);
 
   if (Object.keys(propagateToTasks).length > 0) {
     const todayStr = getTodayString();
@@ -163,19 +120,7 @@ export async function handleEditGoal(args: any, userId: string): Promise<string>
       .where(and(eq(taskSchedules.goalId, goalId), eq(taskSchedules.userId, userId)));
   }
 
-  // Auto-log
-  const goalName = existing.name;
-  if (args.status === 'completed') {
-    await createAutoLog(userId, `🏆 Goal completed: ${goalName}`);
-  } else if (args.status === 'abandoned') {
-    await createAutoLog(userId, `🚫 Goal abandoned: ${goalName}`);
-  } else if (args.status === 'active' && existing.status !== 'active') {
-    await createAutoLog(userId, `🔄 Goal reactivated: ${goalName}`);
-  } else if (args.name && args.name !== goalName) {
-    await createAutoLog(userId, `✏️ Goal renamed: ${goalName} → ${args.name}`);
-  } else {
-    await createAutoLog(userId, `✏️ Goal updated: ${goalName}`);
-  }
+  await logGoalStatusChange(userId, existing, args);
 
-  return `Goal "${args.name || goalName}" updated.`;
+  return `Goal "${args.name || existing.name}" updated.`;
 }

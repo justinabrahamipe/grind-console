@@ -4,6 +4,14 @@ import { calculateDailyScore } from "@/lib/scoring";
 import { calculateMomentum, calculateTrajectory } from "@/lib/momentum";
 import { getYesterdayString } from "@/lib/format";
 
+// Recalculate scores for both the old and new date when a task is moved between dates.
+export async function recalculateDateScores(userId: string, oldDate: string | null, newDate: string | null | undefined): Promise<void> {
+  if (oldDate && newDate !== undefined && oldDate !== newDate) {
+    await saveDailyScore(userId, oldDate);
+    if (newDate) await saveDailyScore(userId, newDate);
+  }
+}
+
 export async function saveDailyScore(userId: string, date: string) {
   // Only recalculate scores for today and yesterday — older scores are frozen
   const yesterdayStr = getYesterdayString();
