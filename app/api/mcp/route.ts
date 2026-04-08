@@ -14,13 +14,28 @@ import { addLogMcpSchema } from "@/lib/schemas/log";
 
 // Convert a zod schema to the MCP tool inputSchema (JSON Schema). Wraps z.toJSONSchema
 // so future schema additions get reflected in tool definitions automatically.
+// Cleans up zod 4's defaults that confuse some MCP clients:
+//  - drops $schema header
+//  - drops `additionalProperties: false` (clients may add wrapper/meta fields)
+//  - drops the SAFE_INTEGER min/max bounds zod adds to z.number().int()
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const cleanJsonSchema = (node: any): any => {
+  if (!node || typeof node !== "object") return node;
+  if (Array.isArray(node)) return node.map(cleanJsonSchema);
+  // Drop noisy fields
+  if ("$schema" in node) delete node.$schema;
+  if (node.additionalProperties === false) delete node.additionalProperties;
+  if (node.type === "integer" && node.minimum === -9007199254740991) delete node.minimum;
+  if (node.type === "integer" && node.maximum === 9007199254740991) delete node.maximum;
+  // Recurse into nested schemas
+  for (const k of Object.keys(node)) {
+    if (typeof node[k] === "object") node[k] = cleanJsonSchema(node[k]);
+  }
+  return node;
+};
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const toInputSchema = (schema: z.ZodType): any => {
-  const json = z.toJSONSchema(schema, { target: "draft-7" });
-  // Strip $schema header — MCP doesn't need it
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  delete (json as any).$schema;
-  return json;
+  return cleanJsonSchema(z.toJSONSchema(schema, { target: "draft-7" }));
 };
 
 const SERVER_INFO = {
@@ -321,7 +336,22 @@ export async function DELETE(request: NextRequest) {
 }
 
 export async function GET() {
-  return new Response(null, { status: 405 });
+  // MCP Streamable HTTP transport: clients open a GET stream for server-initiated messages.
+  // We don't push any (all messages are client-initiated POST), but returning 405 here
+  // makes some connectors (Claude.ai) flash "couldn't reach the MCP server" on connect.
+  // Respond with a valid empty SSE stream that closes immediately so the handshake stays clean.
+  const stream = new ReadableStream({
+    start(controller) {
+      controller.close();
+    },
+  });
+  return new Response(stream, {
+    headers: {
+      "Content-Type": "text/event-stream",
+      "Cache-Control": "no-cache",
+      "Connection": "keep-alive",
+    },
+  });
 }
 
 export async function OPTIONS() {
