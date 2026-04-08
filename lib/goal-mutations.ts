@@ -19,7 +19,12 @@ export async function recalculateGoalCurrentValue(goalId: number, userId: string
         or(eq(tasks.completed, true), gt(tasks.value, 0)),
       ));
     const newTotal = remaining.reduce((sum, t) => sum + (t.value ?? 0), 0);
-    await db.update(goals).set({ currentValue: newTotal }).where(eq(goals.id, goalId));
+    const update: Record<string, unknown> = { currentValue: newTotal };
+    // Project goals auto-complete when every subtask is done
+    if (linkedGoal.goalType === 'project' && linkedGoal.targetValue > 0 && newTotal >= linkedGoal.targetValue) {
+      update.status = 'completed';
+    }
+    await db.update(goals).set(update).where(eq(goals.id, goalId));
   } catch (err) {
     console.error("Failed to recalculate goal currentValue:", err);
   }

@@ -14,8 +14,10 @@ export async function handleCreateGoal(args: any, userId: string): Promise<strin
 
   const goalType = args.goalType || 'outcome';
   const isActivityGoal = goalType === 'habitual' || goalType === 'target';
+  const isProject = goalType === 'project';
 
-  if (!isActivityGoal && args.targetValue == null) {
+  // outcome/target goals need an explicit target. project goals start at 0 and grow with subtasks.
+  if (!isActivityGoal && !isProject && args.targetValue == null) {
     return "Error: targetValue is required for outcome/target goals.";
   }
 
@@ -46,7 +48,7 @@ export async function handleCreateGoal(args: any, userId: string): Promise<strin
     startValue,
     targetValue: args.targetValue ?? 0,
     currentValue: startValue,
-    unit: args.unit || 'days',
+    unit: args.unit || (isProject ? 'steps' : 'days'),
     pillarId,
     startDate,
     targetDate,

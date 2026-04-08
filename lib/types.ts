@@ -358,7 +358,7 @@ export interface GoalFormState {
   startDate: string;
   targetDate: string;
   periodId: string;
-  goalType: "habitual" | "target" | "outcome";
+  goalType: "habitual" | "target" | "outcome" | "project";
   completionType: "checkbox" | "count" | "numeric" | "duration";
   dailyTarget: string;
 

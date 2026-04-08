@@ -55,6 +55,7 @@ export default function GoalCard({
   const progress = getProgress(outcome);
   const color = outcome.pillarColor || "#3B82F6";
   const isHabitual = outcome.goalType === "habitual";
+  const isProject = outcome.goalType === "project";
   const isActivityGoal = outcome.goalType === "target" || outcome.goalType === "habitual";
   const scheduleDays = useMemo(() => parseScheduleDays(outcome.scheduleDays), [outcome.scheduleDays]);
   const [showCyclePicker, setShowCyclePicker] = useState(false);
@@ -190,7 +191,7 @@ export default function GoalCard({
               </span>
             )}
             <span className="text-[11px] px-1.5 py-px rounded-full font-medium bg-zinc-100 text-zinc-500 dark:bg-zinc-700 dark:text-zinc-400 shrink-0">
-              {outcome.goalType === "habitual" ? "Habitual" : outcome.goalType === "target" || outcome.goalType === "effort" ? "Target" : "Outcome"}
+              {outcome.goalType === "habitual" ? "Habitual" : outcome.goalType === "target" || outcome.goalType === "effort" ? "Target" : isProject ? "Project" : "Outcome"}
             </span>
             {outcome.flexibilityRule === "limit_avoid" && (
               <span className="text-[10px] px-1.5 py-px rounded-full font-medium bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400 shrink-0">
@@ -207,7 +208,7 @@ export default function GoalCard({
                 Abandoned
               </span>
             )}
-            {!isActivityGoal && (
+            {!isActivityGoal && !isProject && (
               outcome.targetValue < outcome.startValue ? (
                 <FaArrowDown className="text-xs text-green-500 shrink-0" />
               ) : (
@@ -253,6 +254,11 @@ export default function GoalCard({
                 {effortMetrics && (
                   <span className="text-xs text-zinc-400 dark:text-zinc-500 whitespace-nowrap">· {effortMetrics.requiredRate}/day</span>
                 )}
+              </>
+            ) : isProject ? (
+              <>
+                <span className="whitespace-nowrap">{outcome.currentValue} of {outcome.targetValue} steps</span>
+                {outcome.targetValue > 0 && <span className="font-medium">{Math.round(progress)}%</span>}
               </>
             ) : (
               <>

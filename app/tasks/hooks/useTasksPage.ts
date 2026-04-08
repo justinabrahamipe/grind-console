@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
+import Fuse from "fuse.js";
 import { DEMO_TASK_GROUPS, DEMO_PILLARS } from "@/lib/demo-data";
 import { useTheme } from "@/components/ThemeProvider";
 import { formatDate, getTodayString, getYesterdayString, parseCustomDays } from "@/lib/format";
@@ -183,6 +184,21 @@ export function useTasksPage() {
   const [pillars, setPillars] = useState<Pillar[]>([]);
   const [goalsList, setGoalsList] = useState<Outcome[]>([]);
   const [cycles, setCycles] = useState<Cycle[]>([]);
+  const [searchQuery, setSearchQuery] = useState("");
+
+  // Fuzzy-filter the visible task list. Returns groups containing only matching tasks; empty groups are dropped.
+  const filteredGroups = useMemo(() => {
+    const q = searchQuery.trim();
+    if (!q) return groups;
+    const out: TaskGroup[] = [];
+    for (const g of groups) {
+      const fuse = new Fuse(g.tasks, { keys: ["name", "description"], threshold: 0.4, ignoreLocation: true });
+      const matched = fuse.search(q).map((r) => r.item);
+      if (matched.length > 0) out.push({ ...g, tasks: matched });
+    }
+    return out;
+  }, [groups, searchQuery]);
+
   const hasCachedData = typeof window !== 'undefined' && (() => {
     try {
       const cached = localStorage.getItem('tasks-cache');
@@ -966,19 +982,28 @@ export function useTasksPage() {
     return task.frequency;
   };
 
+  const filteredNoDateTasks = useMemo(() => {
+    const q = searchQuery.trim();
+    if (!q) return noDateTasks;
+    const fuse = new Fuse(noDateTasks, { keys: ["name", "description"], threshold: 0.4, ignoreLocation: true });
+    return fuse.search(q).map((r) => r.item);
+  }, [noDateTasks, searchQuery]);
+
   return {
     // Auth & routing
     status,
     router,
     dateFormat,
     // Data
-    groups,
+    groups: filteredGroups,
     pillars,
     goalsList,
     cycles,
     loading,
     refreshing,
-    noDateTasks,
+    noDateTasks: filteredNoDateTasks,
+    searchQuery,
+    setSearchQuery,
     pastDays,
     // Filters
     filters,

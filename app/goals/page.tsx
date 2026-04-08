@@ -27,6 +27,8 @@ export default function GoalsPage() {
     setGoalTab,
     timeTab,
     setTimeTab,
+    searchQuery,
+    setSearchQuery,
     linkedTasks,
     taskCompletionDates,
     filteredGoals,
@@ -159,6 +161,17 @@ export default function GoalsPage() {
           </div>
         </div>
 
+        {/* Search */}
+        <div className="mb-3">
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search goals…"
+            className="w-full px-3 py-2 text-sm rounded-lg border border-zinc-300 dark:border-zinc-600 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white placeholder:text-zinc-400"
+          />
+        </div>
+
         {/* Goal Type Tabs + Time Tabs */}
         <div className="flex items-center justify-between mb-6 gap-2">
           <div className="hidden md:flex gap-2">
@@ -167,6 +180,7 @@ export default function GoalsPage() {
               { key: "habitual" as const, label: "Habitual" },
               { key: "target" as const, label: "Target" },
               { key: "outcome" as const, label: "Outcome" },
+              { key: "project" as const, label: "Project" },
             ]).map(({ key, label }) => (
               <button
                 key={key}
@@ -183,13 +197,14 @@ export default function GoalsPage() {
           </div>
           <select
             value={goalTab}
-            onChange={(e) => setGoalTab(e.target.value as "all" | "habitual" | "target" | "outcome")}
+            onChange={(e) => setGoalTab(e.target.value as "all" | "habitual" | "target" | "outcome" | "project")}
             className="md:hidden px-3 py-2 text-sm font-semibold rounded-lg border border-zinc-300 dark:border-zinc-600 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white"
           >
             <option value="all">All</option>
             <option value="habitual">Habitual</option>
             <option value="target">Target</option>
             <option value="outcome">Outcome</option>
+            <option value="project">Project</option>
           </select>
 
           <div className="hidden md:flex gap-2">
