@@ -513,9 +513,11 @@ export default function GoalDetailPage() {
       {/* Action buttons row */}
       {outcome.status === 'active' ? (
         <div className="flex flex-wrap gap-2 mb-4">
-          <button onClick={() => setLogTarget(true)} className="px-3 py-1.5 text-xs font-medium rounded-lg bg-zinc-100 dark:bg-zinc-700 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-600">
-            Log Progress
-          </button>
+          {!isProject && (
+            <button onClick={() => setLogTarget(true)} className="px-3 py-1.5 text-xs font-medium rounded-lg bg-zinc-100 dark:bg-zinc-700 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-600">
+              Log Progress
+            </button>
+          )}
           <button onClick={() => router.push(`/goals/${outcome.id}/edit`)} className="px-3 py-1.5 text-xs font-medium rounded-lg bg-zinc-100 dark:bg-zinc-700 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-600">
             Edit
           </button>
