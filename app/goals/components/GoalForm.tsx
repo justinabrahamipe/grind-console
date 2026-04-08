@@ -42,7 +42,7 @@ export default function GoalForm({
   disabled,
 }: {
   editingOutcome: Outcome | null;
-  defaultGoalType?: "habitual" | "target" | "outcome";
+  defaultGoalType?: "habitual" | "target" | "outcome" | "project";
   pillars: Pillar[];
   cycles: CycleOption[];
   onCancel: () => void;
@@ -72,7 +72,7 @@ export default function GoalForm({
         startDate: editingOutcome.startDate || "",
         targetDate: editingOutcome.targetDate || "",
         periodId: editingOutcome.periodId ? String(editingOutcome.periodId) : "",
-        goalType: (editingOutcome.goalType === "effort" ? "target" : editingOutcome.goalType as "habitual" | "target" | "outcome") || "outcome",
+        goalType: (editingOutcome.goalType === "effort" ? "target" : editingOutcome.goalType as "habitual" | "target" | "outcome" | "project") || "outcome",
         completionType: (editingOutcome.completionType as "checkbox" | "count" | "numeric" | "duration") || "checkbox",
         dailyTarget: editingOutcome.dailyTarget ? String(editingOutcome.dailyTarget) : "",
         basePoints: String(editingOutcome.basePoints ?? 10),
@@ -99,6 +99,8 @@ export default function GoalForm({
       periodId: activeCycle ? String(activeCycle.id) : "",
       startDate: activeCycle ? activeCycle.startDate : "",
       targetDate: activeCycle ? activeCycle.endDate : "",
+      autoCreateTasks: goalType === "project" ? false : DEFAULT_FORM.autoCreateTasks,
+      unit: goalType === "project" ? "steps" : DEFAULT_FORM.unit,
     };
   });
 
@@ -118,32 +120,36 @@ export default function GoalForm({
     const isHabitual = form.goalType === "habitual";
     const isTarget = form.goalType === "target";
     const isOutcome = form.goalType === "outcome";
+    const isProject = form.goalType === "project";
 
     if ((isTarget || isOutcome) && form.targetValue === "") return;
     if (isOutcome && form.startValue === "") return;
-    if (!isHabitual && !(form.unit || '').trim()) return;
+    if (!isHabitual && !isProject && !(form.unit || '').trim()) return;
 
     const start = (isTarget || isOutcome) ? (parseFloat(form.startValue) || 0) : 0;
-    const target = isHabitual ? 0 : parseFloat(form.targetValue);
+    const target = isHabitual ? 0 : isProject ? (parseFloat(form.targetValue) || 0) : parseFloat(form.targetValue);
 
     const payload: Record<string, unknown> = {
       name: form.name,
       startValue: start,
       targetValue: target,
-      unit: isHabitual ? (form.unit || "days") : form.unit,
+      unit: isHabitual ? (form.unit || "days") : isProject ? "steps" : form.unit,
       pillarId: form.pillarId ? parseInt(form.pillarId) : null,
       startDate: form.startDate || null,
       targetDate: form.targetDate || null,
       periodId: form.periodId ? parseInt(form.periodId) : null,
       goalType: form.goalType,
-      completionType: form.completionType,
-      dailyTarget: form.dailyTarget ? parseFloat(form.dailyTarget) : null,
-      flexibilityRule: form.flexibilityRule,
+      completionType: isProject ? "checkbox" : form.completionType,
+      dailyTarget: isProject ? null : (form.dailyTarget ? parseFloat(form.dailyTarget) : null),
+      flexibilityRule: isProject ? "must_today" : form.flexibilityRule,
       limitValue: form.flexibilityRule === 'limit_avoid' && form.dailyTarget ? parseFloat(form.dailyTarget) : null,
       basePoints: parseFloat(form.basePoints) || 10,
     };
 
-    {
+    if (isProject) {
+      payload.autoCreateTasks = false;
+      payload.scheduleDays = [];
+    } else {
       payload.autoCreateTasks = form.autoCreateTasks;
 
       let scheduleDays: number[] = [];
@@ -195,11 +201,13 @@ export default function GoalForm({
               value={form.goalType}
               disabled={!!editingOutcome}
               onChange={(e) => {
-                const type = e.target.value as "habitual" | "target" | "outcome";
+                const type = e.target.value as "habitual" | "target" | "outcome" | "project";
                 setForm((prev) => ({
                   ...prev,
                   goalType: type,
-                  completionType: type === "target" ? "count" : type === "outcome" ? "numeric" : prev.completionType,
+                  completionType: type === "target" ? "count" : type === "outcome" ? "numeric" : type === "project" ? "checkbox" : prev.completionType,
+                  unit: type === "project" ? "steps" : prev.unit,
+                  autoCreateTasks: type === "project" ? false : prev.autoCreateTasks,
                 }));
               }}
               className="w-full px-3 py-2 border border-zinc-300 dark:border-zinc-600 rounded-lg bg-white dark:bg-zinc-700 text-zinc-900 dark:text-white disabled:opacity-50 disabled:cursor-not-allowed"
@@ -207,6 +215,7 @@ export default function GoalForm({
               <option value="habitual">Habitual</option>
               <option value="target">Target</option>
               <option value="outcome">Outcome</option>
+              <option value="project">Project</option>
             </select>
           </div>
         <div>
@@ -222,7 +231,7 @@ export default function GoalForm({
       </div>
 
       {/* Tracking Type + Mode + Per-session */}
-      {form.goalType !== "outcome" && (
+      {form.goalType !== "outcome" && form.goalType !== "project" && (
         <div>
           {form.goalType === "target" ? (
             <>
@@ -444,7 +453,7 @@ export default function GoalForm({
       </div>
 
       {/* Start Date + Target Date + Repeat */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+      <div className={`grid grid-cols-1 gap-3 ${form.goalType === "project" ? "md:grid-cols-2" : "md:grid-cols-3"}`}>
         <div>
           <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">Start Date</label>
           <input
@@ -465,22 +474,24 @@ export default function GoalForm({
             className="w-full px-3 py-2 border border-zinc-300 dark:border-zinc-600 rounded-lg bg-white dark:bg-zinc-700 text-zinc-900 dark:text-white"
           />
         </div>
-        <div>
-          <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">Repeat</label>
-          <select
-            value={form.frequencyPreset}
-            onChange={(e) => setForm({ ...form, frequencyPreset: e.target.value })}
-            className="w-full px-3 py-2 border border-zinc-300 dark:border-zinc-600 rounded-lg bg-white dark:bg-zinc-700 text-zinc-900 dark:text-white"
-          >
-            {FREQUENCY_PRESETS.map((opt) => (
-              <option key={opt.value} value={opt.value}>{opt.label}</option>
-            ))}
-          </select>
-        </div>
+        {form.goalType !== "project" && (
+          <div>
+            <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">Repeat</label>
+            <select
+              value={form.frequencyPreset}
+              onChange={(e) => setForm({ ...form, frequencyPreset: e.target.value })}
+              className="w-full px-3 py-2 border border-zinc-300 dark:border-zinc-600 rounded-lg bg-white dark:bg-zinc-700 text-zinc-900 dark:text-white"
+            >
+              {FREQUENCY_PRESETS.map((opt) => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
+              ))}
+            </select>
+          </div>
+        )}
       </div>
 
       {/* Custom repeat options */}
-      {form.frequencyPreset === "custom" && (
+      {form.goalType !== "project" && form.frequencyPreset === "custom" && (
         <div className="space-y-3 p-3 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800/50">
           <div>
             <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">Repeat every</label>
@@ -610,7 +621,7 @@ export default function GoalForm({
 
       {/* Auto-create toggle + action buttons */}
       <div className="flex flex-wrap items-center gap-3 pt-2">
-        {!editingOutcome && (
+        {!editingOutcome && form.goalType !== "project" && (
           <label className="flex items-center gap-2 cursor-pointer mr-auto">
             <div
               className={`relative w-10 h-6 rounded-full transition-colors ${

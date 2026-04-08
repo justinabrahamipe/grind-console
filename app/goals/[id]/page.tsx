@@ -171,8 +171,70 @@ export default function GoalDetailPage() {
 
   const scheduleDays: number[] = parseScheduleDays(outcome?.scheduleDays);
   const isHabitual = outcome?.goalType === "habitual";
+  const isProject = outcome?.goalType === "project";
   const isActivityGoal = outcome?.goalType === "target" || outcome?.goalType === "habitual";
   const color = outcome?.pillarColor || "#3B82F6";
+
+  const [newTaskName, setNewTaskName] = useState("");
+  const [newTaskDate, setNewTaskDate] = useState("");
+  const [addingTask, setAddingTask] = useState(false);
+
+  const refreshLinkedTasks = async () => {
+    if (!outcome) return;
+    const [goalsData, goalTasks] = await Promise.all([
+      fetch("/api/goals").then(r => r.ok ? r.json() : []),
+      fetch("/api/goals/tasks").then(r => r.ok ? r.json() : []),
+    ]);
+    const found = (goalsData as Outcome[]).find(o => String(o.id) === id);
+    if (found) setOutcome(found);
+    const todayStr = getTodayString();
+    const tasks: EnrichedTask[] = (goalTasks as { id: number; name: string; goalId: number; completionType: string; basePoints: number; target: number | null; unit: string | null; date: string; completed: boolean; value: number | null }[])
+      .filter(t => t.goalId === parseInt(id))
+      .map(t => ({
+        id: t.id, name: t.name, goalId: t.goalId, pillarId: 0, frequency: "adhoc",
+        customDays: null, repeatInterval: null, completionType: t.completionType || "checkbox",
+        basePoints: t.basePoints || 0, target: t.target, unit: t.unit, startDate: t.date, date: t.date,
+        periodId: null, _pillarColor: color, _pillarEmoji: '', _pillarName: '',
+        completion: { id: t.id, taskId: t.id, completed: t.completed, value: t.value, pointsEarned: 0, isHighlighted: false, skipped: !t.completed && (t.value === null || t.value === 0) && t.date < todayStr, timerStartedAt: null },
+      } as EnrichedTask));
+    setLinkedTasks(tasks);
+  };
+
+  const handleAddSubtask = async () => {
+    if (!outcome || !newTaskName.trim()) return;
+    setAddingTask(true);
+    try {
+      const res = await fetch("/api/tasks", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: newTaskName.trim(),
+          frequency: "adhoc",
+          goalId: outcome.id,
+          startDate: newTaskDate || "",
+          completionType: "checkbox",
+          basePoints: outcome.basePoints,
+          pillarId: outcome.pillarId,
+        }),
+      });
+      if (res.ok) {
+        // Bump goal targetValue by 1 so progress reflects the new step count
+        await fetch(`/api/goals/${outcome.id}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ targetValue: (outcome.targetValue || 0) + 1 }),
+        });
+        setNewTaskName("");
+        setNewTaskDate("");
+        await refreshLinkedTasks();
+      } else {
+        setSnackbar({ open: true, message: "Failed to add subtask", severity: "error" });
+      }
+    } catch {
+      setSnackbar({ open: true, message: "Failed to add subtask", severity: "error" });
+    }
+    setAddingTask(false);
+  };
 
   const getProgress = (o: Outcome) => {
     const range = o.targetValue - o.startValue;
@@ -423,7 +485,7 @@ export default function GoalDetailPage() {
           {outcome.status === 'abandoned' && (
             <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 shrink-0">Abandoned</span>
           )}
-          {!isActivityGoal && (
+          {!isActivityGoal && !isProject && (
             outcome.targetValue < outcome.startValue ? (
               <FaArrowDown className="text-green-500 shrink-0" />
             ) : (
@@ -502,6 +564,13 @@ export default function GoalDetailPage() {
               <span className="px-2 py-0.5 rounded-full bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400 font-medium">
                 {streak}🔥
               </span>
+            </>
+          ) : isProject ? (
+            <>
+              <span className="text-lg font-semibold text-zinc-900 dark:text-white">
+                {outcome.currentValue} of {outcome.targetValue} steps
+              </span>
+              {outcome.targetValue > 0 && <span className="font-medium">{Math.round(progress)}%</span>}
             </>
           ) : (
             <>
@@ -604,10 +673,12 @@ export default function GoalDetailPage() {
         )}
 
         {/* Linked Tasks */}
-        {linkedTasks.length > 0 && (
+        {(linkedTasks.length > 0 || isProject) && (
           <div>
             <div className="flex items-center justify-between mb-2">
-              <h3 className="text-sm font-semibold text-zinc-700 dark:text-zinc-300">Linked Tasks</h3>
+              <h3 className="text-sm font-semibold text-zinc-700 dark:text-zinc-300">
+                {isProject ? "Steps" : "Linked Tasks"}
+              </h3>
               <div className="flex items-center gap-1">
                 {(["date", "status"] as const).map(col => (
                   <button
@@ -625,6 +696,31 @@ export default function GoalDetailPage() {
                 ))}
               </div>
             </div>
+            {isProject && outcome.status === 'active' && (
+              <div className="flex flex-wrap gap-2 mb-3 p-2 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800/50">
+                <input
+                  type="text"
+                  value={newTaskName}
+                  onChange={(e) => setNewTaskName(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter' && !addingTask) handleAddSubtask(); }}
+                  placeholder="Add a step…"
+                  className="flex-1 min-w-[160px] px-3 py-2 text-sm border border-zinc-300 dark:border-zinc-600 rounded-lg bg-white dark:bg-zinc-700 text-zinc-900 dark:text-white"
+                />
+                <input
+                  type="date"
+                  value={newTaskDate}
+                  onChange={(e) => setNewTaskDate(e.target.value)}
+                  className="px-3 py-2 text-sm border border-zinc-300 dark:border-zinc-600 rounded-lg bg-white dark:bg-zinc-700 text-zinc-900 dark:text-white"
+                />
+                <button
+                  onClick={handleAddSubtask}
+                  disabled={addingTask || !newTaskName.trim()}
+                  className="px-4 py-2 text-sm font-medium rounded-lg bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 hover:bg-zinc-800 dark:hover:bg-zinc-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {addingTask ? "Adding…" : "Add"}
+                </button>
+              </div>
+            )}
             <div className="space-y-2">
               {sortedTasks.map(task => (
                 <TaskItem

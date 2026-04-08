@@ -299,7 +299,7 @@ export const goals = sqliteTable('Goal', {
   startDate: text('startDate'),
   targetDate: text('targetDate'),
   periodId: integer('periodId').references(() => cycles.id, { onDelete: 'set null' }),
-  goalType: text('goalType').notNull().default('outcome'), // 'habitual' | 'target' | 'outcome'
+  goalType: text('goalType').notNull().default('outcome'), // 'habitual' | 'target' | 'outcome' | 'project'
   completionType: text('completionType').notNull().default('checkbox'), // 'checkbox' | 'count' | 'numeric'
   dailyTarget: real('dailyTarget'), // per-session target for count/numeric habitual goals
   scheduleDays: text('scheduleDays'), // JSON weekday array e.g. [1,3,5]

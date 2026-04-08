@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo } from "react";
 import { useSession } from "next-auth/react";
+import Fuse from "fuse.js";
 import { Outcome, Pillar, LinkedTask, LogEntry, CycleOption } from "../types";
 import { DEMO_OUTCOMES, DEMO_PILLARS } from "@/lib/demo-data";
 
@@ -12,14 +13,14 @@ export function useGoals() {
   const [loading, setLoading] = useState(true);
   const [menuOpen, setMenuOpen] = useState<number | null>(null);
   const [logsMap, setLogsMap] = useState<Record<number, LogEntry[]>>({});
-  const [goalTab, setGoalTabState] = useState<"all" | "habitual" | "target" | "outcome">(() => {
+  const [goalTab, setGoalTabState] = useState<"all" | "habitual" | "target" | "outcome" | "project">(() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('goalsGoalTab');
-      if (saved === 'all' || saved === 'habitual' || saved === 'target' || saved === 'outcome') return saved;
+      if (saved === 'all' || saved === 'habitual' || saved === 'target' || saved === 'outcome' || saved === 'project') return saved;
     }
     return "all";
   });
-  const setGoalTab = (v: "all" | "habitual" | "target" | "outcome") => { setGoalTabState(v); localStorage.setItem('goalsGoalTab', v); };
+  const setGoalTab = (v: "all" | "habitual" | "target" | "outcome" | "project") => { setGoalTabState(v); localStorage.setItem('goalsGoalTab', v); };
   const [timeTab, setTimeTabState] = useState<"current" | "future" | "past">(() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('goalsTimeTab');
@@ -28,6 +29,7 @@ export function useGoals() {
     return "current";
   });
   const setTimeTab = (v: "current" | "future" | "past") => { setTimeTabState(v); localStorage.setItem('goalsTimeTab', v); };
+  const [searchQuery, setSearchQuery] = useState("");
   const [linkedTasks, setLinkedTasks] = useState<LinkedTask[]>([]);
   const [taskCompletionDates, setTaskCompletionDates] = useState<Record<number, { date: string; value: number; completed: boolean }[]>>({});
   const [cycles, setCycles] = useState<CycleOption[]>([]);
@@ -228,8 +230,17 @@ export function useGoals() {
     return "current";
   };
 
+  const fuse = useMemo(
+    () => new Fuse(allGoals, { keys: ["name", "pillarName", "unit"], threshold: 0.4, ignoreLocation: true }),
+    [allGoals],
+  );
+
   const filteredGoals = useMemo(() => {
-    return allGoals
+    const q = searchQuery.trim();
+    const base = q
+      ? fuse.search(q).map((r) => r.item)
+      : allGoals;
+    return base
       .filter((o) => {
         if (goalTab === "all") return true;
         const type = o.goalType === "effort" ? "target" : (o.goalType || "outcome");
@@ -237,7 +248,7 @@ export function useGoals() {
       })
       .filter((o) => getTimeCategory(o) === timeTab);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [allGoals, goalTab, timeTab]);
+  }, [allGoals, goalTab, timeTab, searchQuery, fuse]);
 
   const timeCounts = useMemo(() => {
     const counts = { current: 0, future: 0, past: 0 };
@@ -263,6 +274,8 @@ export function useGoals() {
     setGoalTab,
     timeTab,
     setTimeTab,
+    searchQuery,
+    setSearchQuery,
     linkedTasks,
     taskCompletionDates,
     cycles,

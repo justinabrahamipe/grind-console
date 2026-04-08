@@ -138,6 +138,14 @@ export async function completeTask(params: {
           .set({ currentValue: newTotal })
           .where(eq(goals.id, linkedGoal.id));
 
+        // Auto-complete project goals when every subtask is done
+        if (linkedGoal.goalType === 'project' && linkedGoal.status === 'active' && linkedGoal.targetValue > 0 && newTotal >= linkedGoal.targetValue) {
+          await db.update(goals)
+            .set({ status: 'completed' })
+            .where(eq(goals.id, linkedGoal.id));
+          await createAutoLog(userId, `🏆 Project completed: ${linkedGoal.name}`);
+        }
+
         // Auto-complete target goals when target is reached
         if (linkedGoal.goalType === 'target' && linkedGoal.status === 'active') {
           const isDecrease = linkedGoal.targetValue < linkedGoal.startValue;

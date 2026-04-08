@@ -55,11 +55,13 @@ export async function POST(request: Request) {
     const { name, targetValue, unit, pillarId, periodId, goalType, completionType, dailyTarget, scheduleDays, autoCreateTasks, flexibilityRule, limitValue, basePoints } = body;
 
     const isActivityGoal = goalType === 'habitual' || goalType === 'target';
+    const isProject = goalType === 'project';
 
     if (!name) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
     }
-    if (!isActivityGoal && (targetValue == null || !unit)) {
+    // outcome/target need an explicit target + unit; project starts at 0 and grows with subtasks
+    if (!isActivityGoal && !isProject && (targetValue == null || !unit)) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
     }
 
@@ -75,15 +77,17 @@ export async function POST(request: Request) {
       }
     }
 
-    const effectiveStartValue = body.startValue ?? 0;
+    // Coerce to numbers — form may send "" for empty number inputs (project goals don't show startValue)
+    const effectiveStartValue = typeof body.startValue === 'number' ? body.startValue : (parseFloat(body.startValue) || 0);
+    const effectiveTargetValue = typeof targetValue === 'number' ? targetValue : (parseFloat(targetValue) || 0);
 
     const [outcome] = await db.insert(goals).values({
       userId,
       name,
       startValue: effectiveStartValue,
-      targetValue: targetValue ?? 0,
+      targetValue: effectiveTargetValue,
       currentValue: effectiveStartValue,
-      unit: unit || 'days',
+      unit: unit || (isProject ? 'steps' : 'days'),
       pillarId: pillarId || null,
       startDate: effectiveStartDate,
       targetDate: effectiveTargetDate,
