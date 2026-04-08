@@ -243,7 +243,7 @@ export default function TaskDetailPage() {
     await fetch("/api/tasks/highlight", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ taskId: task.id, highlighted: newHighlighted }),
+      body: JSON.stringify({ taskId: task.id, date: taskDate, isHighlighted: newHighlighted }),
     });
     setTask({ ...task, isHighlighted: newHighlighted } as Task & { isHighlighted: boolean });
   };
