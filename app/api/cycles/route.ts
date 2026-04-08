@@ -5,6 +5,7 @@ import { eq, desc } from "drizzle-orm";
 import { calculateEndDate } from "@/lib/cycle-scoring";
 import { getTodayString } from "@/lib/format";
 import { createAutoLog } from "@/lib/auto-log";
+import { cycleCreateSchema } from "@/lib/schemas/cycle";
 
 export async function GET() {
   try {
@@ -33,12 +34,11 @@ export async function POST(request: Request) {
     const userId = await getAuthenticatedUserId();
 
     const body = await request.json();
-    const { name, startDate, endDate: customEndDate, vision, theme } = body;
-
-    if (!name || !startDate) {
-      return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
+    const result = cycleCreateSchema.safeParse(body);
+    if (!result.success) {
+      return NextResponse.json({ error: "Invalid input", details: result.error.issues }, { status: 400 });
     }
-
+    const { name, startDate, endDate: customEndDate, vision, theme } = result.data;
     const endDate = customEndDate || calculateEndDate(startDate);
 
     const [cycle] = await db.insert(cycles).values({
