@@ -184,15 +184,6 @@ export default function TasksPage() {
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.3 }}
       >
-        <div className="mb-3">
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search tasks…"
-            className="w-full px-3 py-2 text-sm rounded-lg border border-zinc-300 dark:border-zinc-600 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white placeholder:text-zinc-400"
-          />
-        </div>
         <DateNavigation
           filters={filters}
           setFilters={setFilters}
@@ -209,6 +200,16 @@ export default function TasksPage() {
           getDateLabel={getDateLabel}
           closePopover={closePopover}
         />
+
+        <div className="mb-3 mt-3">
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search tasks…"
+            className="w-full px-3 py-2 text-sm rounded-lg border border-zinc-300 dark:border-zinc-600 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white placeholder:text-zinc-400"
+          />
+        </div>
 
         {/* Task content */}
         {isScheduledView ? (
