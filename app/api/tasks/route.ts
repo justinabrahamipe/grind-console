@@ -5,6 +5,7 @@ import { eq, and, asc, isNull } from "drizzle-orm";
 import { ensureUpcomingTasks, ensureTasksForDate, invalidateTaskCache, recalcTargetGoalTasks } from "@/lib/ensure-upcoming-tasks";
 import { getTodayString } from "@/lib/format";
 import { createAutoLog } from "@/lib/auto-log";
+import { taskCreateSchema } from "@/lib/schemas/task";
 
 export async function GET(request: NextRequest) {
   try {
@@ -209,11 +210,11 @@ export async function POST(request: Request) {
     const userId = await getAuthenticatedUserId();
 
     const body = await request.json();
-    const { pillarId, name, completionType, target, unit, flexibilityRule, limitValue, frequency, customDays, repeatInterval, basePoints, goalId, periodId, startDate, endDate, description } = body;
-
-    if (!name) {
-      return NextResponse.json({ error: "name is required" }, { status: 400 });
+    const result = taskCreateSchema.safeParse(body);
+    if (!result.success) {
+      return NextResponse.json({ error: "Invalid input", details: result.error.issues }, { status: 400 });
     }
+    const { pillarId, name, completionType, target, unit, flexibilityRule, limitValue, frequency, customDays, repeatInterval, basePoints, goalId, periodId, startDate, endDate, description } = result.data;
 
     // Verify pillar belongs to user (if provided)
     if (pillarId) {

@@ -5,6 +5,23 @@ import { handleGetTasks, handleGetGoals, handleGetScores, handleGetLogs, handleG
 import { handleCompleteTask, handleCreateTask, handleEditTask, handleDeleteTask } from "./handlers/task-handlers";
 import { handleCreateGoal, handleEditGoal } from "./handlers/goal-handlers";
 import { handleCreatePillar, handleEditPillar, handleCreateCycle, handleEditCycle, handleAddLog } from "./handlers/pillar-handlers";
+import { z } from "zod";
+import { goalCreateMcpSchema, goalEditMcpSchema } from "@/lib/schemas/goal";
+import { taskCreateSchema, taskEditMcpSchema, taskCompleteMcpSchema, taskDeleteMcpSchema } from "@/lib/schemas/task";
+import { pillarCreateSchema, pillarEditMcpSchema } from "@/lib/schemas/pillar";
+import { cycleCreateSchema, cycleEditMcpSchema } from "@/lib/schemas/cycle";
+import { addLogMcpSchema } from "@/lib/schemas/log";
+
+// Convert a zod schema to the MCP tool inputSchema (JSON Schema). Wraps z.toJSONSchema
+// so future schema additions get reflected in tool definitions automatically.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const toInputSchema = (schema: z.ZodType): any => {
+  const json = z.toJSONSchema(schema, { target: "draft-7" });
+  // Strip $schema header — MCP doesn't need it
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  delete (json as any).$schema;
+  return json;
+};
 
 const SERVER_INFO = {
   name: "grind-console",
@@ -108,215 +125,68 @@ const TOOLS = [
     name: "complete_task",
     description: "Mark a task as complete or update its value. Use get_tasks first to find the task ID.",
     annotations: WRITE_ANNOTATION,
-    inputSchema: {
-      type: "object",
-      properties: {
-        taskId: { type: "number", description: "The task instance ID." },
-        value: { type: "number", description: "The value to set (for numeric tasks). Omit for checkbox tasks." },
-        completed: { type: "boolean", description: "Whether the task is completed. Defaults to true." },
-      },
-      required: ["taskId"],
-    },
+    inputSchema: toInputSchema(taskCompleteMcpSchema),
   },
   {
     name: "add_log",
     description: "Add a log entry (note/journal) for a given date.",
     annotations: WRITE_ANNOTATION,
-    inputSchema: {
-      type: "object",
-      properties: {
-        notes: { type: "string", description: "The log text/notes." },
-        date: { type: "string", description: "Date for the log (YYYY-MM-DD). Defaults to today." },
-        time: { type: "string", description: "Time for the log (HH:MM). Defaults to current time." },
-        latitude: { type: "number", description: "Latitude (-90 to 90). Defaults to 0." },
-        longitude: { type: "number", description: "Longitude (-180 to 180). Defaults to 0." },
-      },
-      required: ["notes"],
-    },
+    inputSchema: toInputSchema(addLogMcpSchema),
   },
   {
     name: "create_task",
-    description: "Create a new task. Can be adhoc (one-time) or recurring (daily/weekly/custom). When goalId is provided, inherits the goal's start date, pillar, and period automatically.",
+    description: "Create a new task. Can be adhoc (one-time) or recurring (daily/weekly/custom). When goalId is provided, inherits the goal's start date, pillar, and period automatically. Field shapes derived from lib/schemas/task.ts.",
     annotations: WRITE_ANNOTATION,
-    inputSchema: {
-      type: "object",
-      properties: {
-        name: { type: "string", description: "Task name." },
-        pillarId: { type: "number", description: "Pillar ID to group under (optional, inherited from goal if linked)." },
-        completionType: { type: "string", description: "One of: checkbox, numeric, duration. Defaults to checkbox." },
-        target: { type: "number", description: "Target value for numeric/duration tasks." },
-        unit: { type: "string", description: "Unit label (e.g. 'minutes', 'pages')." },
-        frequency: { type: "string", description: "One of: adhoc, daily, weekdays, weekends, custom, monthly, interval. Defaults to adhoc." },
-        customDays: { type: "string", description: "Comma-separated days (mon,tue,wed,...) for custom frequency, or day-of-month numbers for monthly." },
-        repeatInterval: { type: "number", description: "Repeat interval. For custom: N*7 means every N weeks (e.g. 21 = every 3 weeks). For monthly: every N months. For interval: every N days." },
-        basePoints: { type: "number", description: "Points for completing the task. Defaults to 10." },
-        goalId: { type: "number", description: "Goal ID to link this task to (optional). Use get_goals to find the ID. Inherits start date, pillar, and period from the goal." },
-        flexibilityRule: { type: "string", description: "One of: must_today, at_least, limit_avoid. Defaults to must_today." },
-        limitValue: { type: "number", description: "Limit value for limit_avoid tasks (max allowed)." },
-        startDate: { type: "string", description: "Start date for recurring tasks (YYYY-MM-DD). Inherited from goal if linked." },
-        endDate: { type: "string", description: "End date for recurring tasks (YYYY-MM-DD). Inherited from goal target date if linked." },
-        date: { type: "string", description: "Date for adhoc tasks (YYYY-MM-DD). Inherited from goal start date if linked." },
-        description: { type: "string", description: "Optional description/notes for the task." },
-      },
-      required: ["name"],
-    },
+    inputSchema: toInputSchema(taskCreateSchema),
   },
   {
     name: "edit_task",
-    description: "Edit an existing task's properties. Use get_tasks first to find the task ID.",
+    description: "Edit an existing task's properties. Use get_tasks first to find the task ID. Field shapes derived from lib/schemas/task.ts.",
     annotations: WRITE_ANNOTATION,
-    inputSchema: {
-      type: "object",
-      properties: {
-        taskId: { type: "number", description: "The task instance ID to edit." },
-        name: { type: "string", description: "New task name." },
-        pillarId: { type: "number", description: "New pillar ID." },
-        completionType: { type: "string", description: "One of: checkbox, numeric, duration." },
-        target: { type: "number", description: "New target value." },
-        unit: { type: "string", description: "New unit label." },
-        basePoints: { type: "number", description: "New base points." },
-        date: { type: "string", description: "New date (YYYY-MM-DD)." },
-        goalId: { type: "number", description: "Goal ID to link to. Pass 0 to unlink." },
-        flexibilityRule: { type: "string", description: "One of: must_today, at_least, limit_avoid." },
-        limitValue: { type: "number", description: "Limit value for limit_avoid rule." },
-        description: { type: "string", description: "New description/notes for the task." },
-      },
-      required: ["taskId"],
-    },
+    inputSchema: toInputSchema(taskEditMcpSchema),
   },
   {
     name: "create_goal",
-    description: "Create a new goal. Types: outcome (track a measurable result), target (accumulate toward a number), habitual (build a daily habit).",
+    description: "Create a new goal. Field shapes (including the project type) are derived from lib/schemas/goal.ts — see goalType description for the four supported types.",
     annotations: WRITE_ANNOTATION,
-    inputSchema: {
-      type: "object",
-      properties: {
-        name: { type: "string", description: "Goal name." },
-        goalType: { type: "string", description: "One of: outcome, target, habitual, project. Defaults to outcome. 'project' = a fixed checklist of one-off subtasks (e.g. 'Surrender passport'); progress ticks up automatically as linked tasks are completed and the goal auto-completes when all subtasks are done. Project goals don't require targetValue/unit/scheduleDays — targetValue grows as you add subtasks via create_task with goalId." },
-        targetValue: { type: "number", description: "Target value to reach (required for outcome/target goals; not needed for project — defaults to 0 and grows with each subtask added)." },
-        unit: { type: "string", description: "Unit of measurement (e.g. 'kg', 'pages', 'days'). Defaults to 'days'." },
-        startValue: { type: "number", description: "Starting value. Defaults to 0." },
-        pillarId: { type: "number", description: "Pillar ID to link to (optional)." },
-        periodId: { type: "number", description: "Cycle/period ID to link to (optional). Use create_cycle first to get the ID." },
-        startDate: { type: "string", description: "Start date (YYYY-MM-DD)." },
-        targetDate: { type: "string", description: "Target/deadline date (YYYY-MM-DD)." },
-        completionType: { type: "string", description: "One of: checkbox, count, numeric. Defaults to checkbox." },
-        dailyTarget: { type: "number", description: "Per-session target for habitual/target goals." },
-        autoCreateTasks: { type: "boolean", description: "Auto-create daily tasks for this goal. Defaults to false." },
-        scheduleDays: { type: "array", items: { type: "number" }, description: "Days of week to schedule (0=Sun, 1=Mon, ..., 6=Sat)." },
-        flexibilityRule: { type: "string", description: "One of: must_today, at_least, limit_avoid. Defaults to must_today." },
-        limitValue: { type: "number", description: "Limit value for limit_avoid goals." },
-      },
-      required: ["name"],
-    },
+    inputSchema: toInputSchema(goalCreateMcpSchema),
   },
   {
     name: "edit_goal",
-    description: "Edit an existing goal's properties. Use get_goals first to find the goal ID.",
+    description: "Edit an existing goal's properties. Use get_goals first to find the goal ID. Field shapes derived from lib/schemas/goal.ts.",
     annotations: WRITE_ANNOTATION,
-    inputSchema: {
-      type: "object",
-      properties: {
-        goalId: { type: "number", description: "The goal ID to edit." },
-        name: { type: "string", description: "New goal name." },
-        pillarId: { type: "number", description: "New pillar ID." },
-        startValue: { type: "number", description: "New start value." },
-        targetValue: { type: "number", description: "New target value." },
-        unit: { type: "string", description: "New unit." },
-        startDate: { type: "string", description: "New start date (YYYY-MM-DD)." },
-        targetDate: { type: "string", description: "New target date (YYYY-MM-DD)." },
-        status: { type: "string", description: "One of: active, completed, abandoned." },
-        periodId: { type: "number", description: "Cycle/period ID to link to. Pass 0 to unlink." },
-        dailyTarget: { type: "number", description: "New per-session target." },
-        completionType: { type: "string", description: "One of: checkbox, count, numeric." },
-        goalType: { type: "string", description: "One of: outcome, target, habitual, project." },
-        scheduleDays: { type: "array", items: { type: "number" }, description: "Days of week (0=Sun..6=Sat)." },
-        autoCreateTasks: { type: "boolean", description: "Auto-create daily tasks." },
-        flexibilityRule: { type: "string", description: "One of: must_today, at_least, limit_avoid." },
-        limitValue: { type: "number", description: "Limit value for limit_avoid." },
-        basePoints: { type: "number", description: "Points awarded per task completion." },
-      },
-      required: ["goalId"],
-    },
+    inputSchema: toInputSchema(goalEditMcpSchema),
   },
   {
     name: "create_cycle",
-    description: "Create a new cycle/period (e.g. monthly sprint). Goals can be linked to cycles via periodId.",
+    description: "Create a new cycle/period. Field shapes derived from lib/schemas/cycle.ts.",
     annotations: WRITE_ANNOTATION,
-    inputSchema: {
-      type: "object",
-      properties: {
-        name: { type: "string", description: "Cycle name (e.g. 'April 2026')." },
-        startDate: { type: "string", description: "Start date (YYYY-MM-DD)." },
-        endDate: { type: "string", description: "End date (YYYY-MM-DD)." },
-        vision: { type: "string", description: "Vision statement for this cycle (optional)." },
-        theme: { type: "string", description: "Theme for this cycle (optional)." },
-      },
-      required: ["name", "startDate", "endDate"],
-    },
+    inputSchema: toInputSchema(cycleCreateSchema),
   },
   {
     name: "create_pillar",
-    description: "Create a new life pillar (category for grouping tasks and goals).",
+    description: "Create a new life pillar. Field shapes derived from lib/schemas/pillar.ts.",
     annotations: WRITE_ANNOTATION,
-    inputSchema: {
-      type: "object",
-      properties: {
-        name: { type: "string", description: "Pillar name (e.g. 'Health', 'Career')." },
-        emoji: { type: "string", description: "Emoji icon. Defaults to '📌'." },
-        color: { type: "string", description: "Hex color (e.g. '#3B82F6'). Defaults to blue." },
-        defaultBasePoints: { type: "number", description: "Default base points for tasks in this pillar (default 10)." },
-        description: { type: "string", description: "Description of this pillar (optional)." },
-      },
-      required: ["name"],
-    },
+    inputSchema: toInputSchema(pillarCreateSchema),
   },
   {
     name: "edit_pillar",
     description: "Edit an existing pillar. Use get_pillars to find the ID.",
     annotations: WRITE_ANNOTATION,
-    inputSchema: {
-      type: "object",
-      properties: {
-        pillarId: { type: "number", description: "The pillar ID to edit." },
-        name: { type: "string", description: "New name." },
-        emoji: { type: "string", description: "New emoji." },
-        color: { type: "string", description: "New hex color." },
-        defaultBasePoints: { type: "number", description: "Default base points for tasks in this pillar." },
-        description: { type: "string", description: "New description." },
-      },
-      required: ["pillarId"],
-    },
+    inputSchema: toInputSchema(pillarEditMcpSchema),
   },
   {
     name: "edit_cycle",
     description: "Edit an existing cycle/period. Use get_cycles to find the ID.",
     annotations: WRITE_ANNOTATION,
-    inputSchema: {
-      type: "object",
-      properties: {
-        cycleId: { type: "number", description: "The cycle ID to edit." },
-        name: { type: "string", description: "New name." },
-        startDate: { type: "string", description: "New start date (YYYY-MM-DD)." },
-        endDate: { type: "string", description: "New end date (YYYY-MM-DD)." },
-        vision: { type: "string", description: "New vision statement." },
-        theme: { type: "string", description: "New theme." },
-      },
-      required: ["cycleId"],
-    },
+    inputSchema: toInputSchema(cycleEditMcpSchema),
   },
   // --- Destructive tools ---
   {
     name: "delete_task",
-    description: "Delete a task. Goal-linked tasks are dismissed instead of deleted to prevent auto-recreation. Use get_tasks first to find the task ID.",
+    description: "Delete a task. Goal-linked tasks are dismissed instead of deleted to prevent auto-recreation.",
     annotations: DESTRUCTIVE_ANNOTATION,
-    inputSchema: {
-      type: "object",
-      properties: {
-        taskId: { type: "number", description: "The task ID to delete." },
-      },
-      required: ["taskId"],
-    },
+    inputSchema: toInputSchema(taskDeleteMcpSchema),
   },
 ];
 

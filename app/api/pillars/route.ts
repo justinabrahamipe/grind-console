@@ -3,6 +3,7 @@ import { getAuthenticatedUserId, errorResponse } from "@/lib/api-utils";
 import { db, pillars } from "@/lib/db";
 import { eq } from "drizzle-orm";
 import { createAutoLog } from "@/lib/auto-log";
+import { pillarCreateSchema } from "@/lib/schemas/pillar";
 
 export async function GET() {
   try {
@@ -24,11 +25,11 @@ export async function POST(request: Request) {
     const userId = await getAuthenticatedUserId();
 
     const body = await request.json();
-    const { name, emoji, color, defaultBasePoints, description } = body;
-
-    if (!name) {
-      return NextResponse.json({ error: "Name is required" }, { status: 400 });
+    const result = pillarCreateSchema.safeParse(body);
+    if (!result.success) {
+      return NextResponse.json({ error: "Invalid input", details: result.error.issues }, { status: 400 });
     }
+    const { name, emoji, color, defaultBasePoints, description } = result.data;
 
     const [pillar] = await db.insert(pillars).values({
       userId,

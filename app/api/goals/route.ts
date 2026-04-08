@@ -4,6 +4,7 @@ import { db, goals, pillars, cycles } from "@/lib/db";
 import { eq } from "drizzle-orm";
 import { createAutoLog } from "@/lib/auto-log";
 import { generateGoalTasks } from "@/lib/ensure-upcoming-tasks";
+import { goalCreateSchema, applyGoalDbTransforms } from "@/lib/schemas/goal";
 
 export async function GET() {
   try {
@@ -52,62 +53,64 @@ export async function POST(request: Request) {
     const userId = await getAuthenticatedUserId();
 
     const body = await request.json();
-    const { name, targetValue, unit, pillarId, periodId, goalType, completionType, dailyTarget, scheduleDays, autoCreateTasks, flexibilityRule, limitValue, basePoints } = body;
 
+    // Validate via the shared schema (single source of truth with MCP and edit endpoints)
+    const result = goalCreateSchema.safeParse(body);
+    if (!result.success) {
+      return NextResponse.json({ error: "Invalid input", details: result.error.issues }, { status: 400 });
+    }
+    const data = result.data;
+
+    const goalType = data.goalType ?? 'outcome';
     const isActivityGoal = goalType === 'habitual' || goalType === 'target';
     const isProject = goalType === 'project';
 
-    if (!name) {
-      return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
-    }
     // outcome/target need an explicit target + unit; project starts at 0 and grows with subtasks
-    if (!isActivityGoal && !isProject && (targetValue == null || !unit)) {
-      return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
+    if (!isActivityGoal && !isProject && (data.targetValue == null || !data.unit)) {
+      return NextResponse.json({ error: "outcome/target goals require targetValue and unit" }, { status: 400 });
     }
 
     // For activity goals, derive dates from the linked cycle
-    let effectiveStartDate = body.startDate || null;
-    let effectiveTargetDate = body.targetDate || null;
-
-    if (isActivityGoal && periodId) {
-      const [cycle] = await db.select().from(cycles).where(eq(cycles.id, parseInt(periodId)));
+    let effectiveStartDate = data.startDate || null;
+    let effectiveTargetDate = data.targetDate || null;
+    if (isActivityGoal && data.periodId) {
+      const [cycle] = await db.select().from(cycles).where(eq(cycles.id, data.periodId));
       if (cycle) {
         if (!effectiveStartDate) effectiveStartDate = cycle.startDate;
         if (!effectiveTargetDate) effectiveTargetDate = cycle.endDate;
       }
     }
 
-    // Coerce to numbers — form may send "" for empty number inputs (project goals don't show startValue)
-    const effectiveStartValue = typeof body.startValue === 'number' ? body.startValue : (parseFloat(body.startValue) || 0);
-    const effectiveTargetValue = typeof targetValue === 'number' ? targetValue : (parseFloat(targetValue) || 0);
+    const startValue = data.startValue ?? 0;
+    const transformed = applyGoalDbTransforms(data);
 
     const [outcome] = await db.insert(goals).values({
       userId,
-      name,
-      startValue: effectiveStartValue,
-      targetValue: effectiveTargetValue,
-      currentValue: effectiveStartValue,
-      unit: unit || (isProject ? 'steps' : 'days'),
-      pillarId: pillarId || null,
+      name: data.name,
+      startValue,
+      targetValue: data.targetValue ?? 0,
+      currentValue: startValue,
+      unit: data.unit || (isProject ? 'steps' : 'days'),
+      pillarId: (transformed.pillarId as number | null) ?? null,
       startDate: effectiveStartDate,
       targetDate: effectiveTargetDate,
-      periodId: periodId || null,
-      goalType: goalType || 'outcome',
-      completionType: completionType || 'checkbox',
-      dailyTarget: dailyTarget ?? null,
-      scheduleDays: scheduleDays ? JSON.stringify(scheduleDays) : null,
-      autoCreateTasks: autoCreateTasks || false,
-      flexibilityRule: flexibilityRule || 'must_today',
-      limitValue: limitValue ?? null,
-      basePoints: basePoints ?? 10,
+      periodId: (transformed.periodId as number | null) ?? null,
+      goalType,
+      completionType: data.completionType || 'checkbox',
+      dailyTarget: data.dailyTarget ?? null,
+      scheduleDays: (transformed.scheduleDays as string | null) ?? null,
+      autoCreateTasks: data.autoCreateTasks || false,
+      flexibilityRule: data.flexibilityRule || 'must_today',
+      limitValue: data.limitValue ?? null,
+      basePoints: data.basePoints ?? 10,
     }).returning();
 
     // Generate all tasks upfront for the full goal date range
-    if (autoCreateTasks) {
+    if (data.autoCreateTasks) {
       await generateGoalTasks(userId, outcome.id);
     }
 
-    await createAutoLog(userId, `📌 Goal created: ${name}`);
+    await createAutoLog(userId, `📌 Goal created: ${data.name}`);
     return NextResponse.json(outcome, { status: 201 });
   } catch (error) {
     return errorResponse(error);
