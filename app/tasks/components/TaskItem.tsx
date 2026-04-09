@@ -137,10 +137,11 @@ const TaskItem = memo(function TaskItem({
     return isDecrease ? (goal.currentValue ?? 0) <= expected : (goal.currentValue ?? 0) >= expected;
   })();
 
-  // For outcome/target goal tasks, goal status takes priority over task completion
-  // (completing the task just means logging a value, not that the value is good)
-  // For non-goal tasks, task completion = green
+  // Task met/exceeded its own daily target (e.g. 3/2 job apps) → always green
+  // Just logging a value for outcome goals (no task target) → use goal status
+  const taskTargetMet = !isDiscarded && !isLimitTask && task.target != null && task.target > 0 && currentValue >= task.target;
   const progressColor = isOverLimit ? '#ef4444'
+    : taskTargetMet ? '#22C55E'
     : outcomeOnTrack === true ? '#22C55E'
     : outcomeOnTrack === false ? '#EF4444'
     : isFullyDone ? '#22C55E'
