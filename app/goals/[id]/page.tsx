@@ -104,6 +104,16 @@ export default function GoalDetailPage() {
     try {
       await fetch(`/api/tasks/${taskId}`, { method: 'DELETE' });
       setLinkedTasks(prev => prev.filter(t => t.id !== taskId));
+      // Decrement targetValue for project goals
+      if (outcome && isProject && outcome.targetValue > 0) {
+        const newTarget = outcome.targetValue - 1;
+        fetch(`/api/goals/${outcome.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ targetValue: newTarget }),
+        });
+        setOutcome({ ...outcome, targetValue: newTarget });
+      }
     } catch (err) {
       console.error("Failed to delete task:", err);
     }
@@ -163,6 +173,17 @@ export default function GoalDetailPage() {
 
         setLinkedTasks(tasks);
         setTaskCompletionDates(goalCompletions);
+
+        // Sync targetValue with actual task count for project goals
+        if (found && found.goalType === 'project' && tasks.length !== found.targetValue) {
+          fetch(`/api/goals/${found.id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ targetValue: tasks.length }),
+          });
+          setOutcome({ ...found, targetValue: tasks.length });
+        }
+
         setLoading(false);
       });
     }
@@ -238,7 +259,7 @@ export default function GoalDetailPage() {
 
   const getProgress = (o: Outcome) => {
     const range = o.targetValue - o.startValue;
-    if (range === 0) return 100;
+    if (range === 0) return o.goalType === 'project' ? 0 : 100;
     return Math.min((o.currentValue - o.startValue) / range * 100, 100);
   };
 
