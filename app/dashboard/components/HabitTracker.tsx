@@ -49,10 +49,10 @@ export default function HabitTracker({ outcomesData, completionDates, today }: H
 
       {/* Day labels row */}
       <div className="flex items-center gap-0 mb-1">
-        <div className="w-28 shrink-0" />
+        <div className="w-28 md:w-48 shrink-0" />
         <div className="flex gap-0.5">
           {dayLabels.map((label, i) => (
-            <div key={i} className="w-3 text-[9px] text-zinc-400 dark:text-zinc-500 text-center">{label}</div>
+            <div key={i} className="w-3.5 text-[9px] text-zinc-400 dark:text-zinc-500 text-center">{label}</div>
           ))}
         </div>
         <div className="w-10 shrink-0" />
@@ -139,13 +139,13 @@ function HabitRow({ goal, completionDates, today, days }: { goal: OutcomeData; c
 
   return (
     <div className="flex items-center gap-0">
-      <div className="w-28 shrink-0 flex items-center gap-1.5 min-w-0">
+      <div className="w-28 md:w-48 shrink-0 flex items-center gap-1.5 min-w-0">
         {goal.pillarEmoji && <span className="text-xs">{goal.pillarEmoji}</span>}
         <span className="text-xs font-medium text-zinc-700 dark:text-zinc-300 truncate">{goal.name}</span>
       </div>
       <div className="flex gap-0.5">
         {cells.map((status, i) => (
-          <div key={i} className={`w-3 h-3 rounded-sm ${getCellClass(status)}`} />
+          <div key={i} className={`w-3.5 h-3.5 rounded-sm ${getCellClass(status)}`} />
         ))}
       </div>
       <div className="w-10 shrink-0 text-right">
