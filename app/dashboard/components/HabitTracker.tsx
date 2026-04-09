@@ -15,6 +15,8 @@ interface HabitTrackerProps {
 const CELL_SIZE = 14; // w-3.5 = 14px
 const CELL_GAP = 2;  // gap-0.5 = 2px
 const PCT_W = 44; // w-11
+const NAME_MIN = 100; // minimum space for habit name
+const ML_GAP = 8; // ml-2
 
 export default function HabitTracker({ outcomesData, completionDates, today }: HabitTrackerProps) {
   const habitGoals = outcomesData.filter(o => o.goalType === 'habitual');
@@ -27,8 +29,8 @@ export default function HabitTracker({ outcomesData, completionDates, today }: H
     const calculate = () => {
       if (!containerRef.current) return;
       const totalWidth = containerRef.current.offsetWidth;
-      const available = totalWidth - PCT_W;
-      const count = Math.max(7, Math.floor((available + CELL_GAP) / (CELL_SIZE + CELL_GAP)));
+      const available = totalWidth - PCT_W - NAME_MIN - ML_GAP;
+      const count = Math.max(7, Math.min(28, Math.floor((available + CELL_GAP) / (CELL_SIZE + CELL_GAP))));
       setDayCount(count);
     };
     calculate();
@@ -53,7 +55,7 @@ export default function HabitTracker({ outcomesData, completionDates, today }: H
   ), [days]);
 
   return (
-    <div ref={containerRef} className="bg-white dark:bg-zinc-800 rounded-2xl shadow-sm border border-zinc-200 dark:border-zinc-700 p-4 mb-6">
+    <div ref={containerRef} className="bg-white dark:bg-zinc-800 rounded-2xl shadow-sm border border-zinc-200 dark:border-zinc-700 p-4 mb-6 overflow-hidden">
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
           <FaFire className="text-lg text-orange-500" />
