@@ -554,8 +554,8 @@ export default function GoalForm({
         </div>
       )}
 
-      {/* Task Points */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 items-end">
+      {/* Task Points — hidden for target/outcome goals since their tasks are excluded from action score */}
+      {form.goalType !== "target" && form.goalType !== "outcome" && <div className="grid grid-cols-1 md:grid-cols-2 gap-3 items-end">
         <div>
           <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">Task Points</label>
           <div className="flex items-center gap-1">
@@ -617,7 +617,7 @@ export default function GoalForm({
             </div>
           )}
         </div>
-      </div>
+      </div>}
 
       {/* Auto-create toggle + action buttons */}
       <div className="flex flex-wrap items-center gap-3 pt-2">

@@ -181,7 +181,8 @@ export async function generateGoalTasks(userId: string, goalId: number) {
   if (!outcome || !outcome.autoCreateTasks || outcome.status !== 'active') return;
 
   const scheduleDays: number[] = parseScheduleDays(outcome.scheduleDays);
-  if (scheduleDays.length === 0) return;
+  // Default to all 7 days if no schedule specified
+  const effectiveScheduleDays = scheduleDays.length > 0 ? scheduleDays : [0, 1, 2, 3, 4, 5, 6];
 
   const todayStr = getTodayString();
 
@@ -214,14 +215,14 @@ export async function generateGoalTasks(userId: string, goalId: number) {
       let remainingDays: number;
       if (isFuture) {
         remainingDays = outcome.targetDate
-          ? countScheduledDaysInRange(outcome.startDate!, outcome.targetDate, scheduleDays) || 1
+          ? countScheduledDaysInRange(outcome.startDate!, outcome.targetDate, effectiveScheduleDays) || 1
           : 1;
       } else {
         const tmrw = new Date(todayStr + 'T12:00:00');
         tmrw.setDate(tmrw.getDate() + 1);
         const tmrwStr = tmrw.toISOString().split('T')[0];
         remainingDays = outcome.targetDate
-          ? (countScheduledDaysInRange(tmrwStr, outcome.targetDate, scheduleDays) || 1)
+          ? (countScheduledDaysInRange(tmrwStr, outcome.targetDate, effectiveScheduleDays) || 1)
           : 1;
       }
       taskDailyTarget = Math.ceil(Math.max(0, remainingValue) / remainingDays);
@@ -248,7 +249,7 @@ export async function generateGoalTasks(userId: string, goalId: number) {
     const dateStr = current.toISOString().split('T')[0];
     const dow = current.getDay();
 
-    if (scheduleDays.includes(dow) && !existingSet.has(dateStr)) {
+    if (effectiveScheduleDays.includes(dow) && !existingSet.has(dateStr)) {
       const isLimit = outcome.flexibilityRule === 'limit_avoid';
       const goalLimitValue = isLimit ? (outcome.limitValue || outcome.dailyTarget || null) : null;
       try {

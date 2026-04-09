@@ -17,6 +17,7 @@ interface TaskGroupProps {
 
 export default function TaskGroup({
   tasks,
+  goalsList,
   router,
   handleDelete,
   getScheduleLabel,
@@ -61,9 +62,11 @@ export default function TaskGroup({
                       Target: {task.target}{task.unit ? ` ${task.unit}` : ''}
                     </span>
                   )}
-                  <span className="text-[11px] text-zinc-400 dark:text-zinc-500">
-                    {task.basePoints}pts
-                  </span>
+                  {!(task.goalId && goalsList.some(g => g.id === task.goalId && (g.goalType === 'target' || g.goalType === 'outcome'))) && (
+                    <span className="text-[11px] text-zinc-400 dark:text-zinc-500">
+                      {task.basePoints}pts
+                    </span>
+                  )}
                 </div>
               </div>
               <div className="flex items-center gap-1 shrink-0">

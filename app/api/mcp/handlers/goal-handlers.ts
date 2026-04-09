@@ -58,14 +58,14 @@ export async function handleCreateGoal(args: any, userId: string): Promise<strin
     completionType: args.completionType || 'checkbox',
     dailyTarget: args.dailyTarget ?? null,
     scheduleDays: scheduleDays ? JSON.stringify(scheduleDays) : null,
-    autoCreateTasks: args.autoCreateTasks || false,
+    autoCreateTasks: args.autoCreateTasks === true || args.autoCreateTasks === 'true' || isActivityGoal,
     flexibilityRule: args.flexibilityRule || 'must_today',
     limitValue: args.limitValue ?? null,
     basePoints: args.basePoints ?? 10,
   }).returning();
 
   // Generate all tasks upfront for the full goal date range
-  if (args.autoCreateTasks) {
+  if (goal.autoCreateTasks) {
     await generateGoalTasks(userId, goal.id);
   }
 
