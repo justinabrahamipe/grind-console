@@ -68,10 +68,10 @@ export default function GoalProgress({ outcomesData, completionDates, today }: G
             : `${goal.currentValue} / ${goal.targetValue} ${goal.unit}`;
           const progressColor = getProgressColor(progress);
 
-          // Compute trajectory + momentum ratio
+          // Compute trajectory + momentum ratio (skip for project goals — no time-based pace)
           let trajectory: { label: string; color: string } | null = null;
           let momentum: { value: number; color: string } | null = null;
-          if (goal.startDate && goal.targetDate && range !== 0) {
+          if (goal.goalType !== 'project' && goal.startDate && goal.targetDate && range !== 0) {
             const totalMs = new Date(goal.targetDate).getTime() - new Date(goal.startDate).getTime();
             const elapsedMs = new Date(today > goal.targetDate ? goal.targetDate : today).getTime() - new Date(goal.startDate).getTime();
             if (totalMs > 0 && elapsedMs >= 0) {
