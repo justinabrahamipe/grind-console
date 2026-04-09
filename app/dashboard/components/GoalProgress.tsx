@@ -73,7 +73,7 @@ export default function GoalProgress({ outcomesData, completionDates, today }: G
           const badge = getGoalBadge(goal, today);
           const subtitle = goal.goalType === 'project' && goal.targetValue === 0
             ? 'No steps yet'
-            : `${fmtNum(goal.currentValue)} / ${fmtNum(goal.targetValue)} ${goal.unit}`;
+            : `${fmtNum(goal.currentValue)}/${fmtNum(goal.targetValue)}`;
 
           return (
             <Link
@@ -89,16 +89,16 @@ export default function GoalProgress({ outcomesData, completionDates, today }: G
                 }}
               />
               <div className="relative">
-                <div className="text-sm font-semibold text-zinc-900 dark:text-white truncate">{goal.name}</div>
-                <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
-                  <span className="text-[11px] font-bold px-1.5 py-0.5 rounded-md" style={{ backgroundColor: progressColor + '18', color: progressColor }}>
+                <div className="text-sm font-semibold text-zinc-900 dark:text-white truncate mb-1">{goal.name}</div>
+                <div className="flex items-center gap-1">
+                  <span className="text-[10px] font-bold px-1 py-px rounded" style={{ backgroundColor: progressColor + '18', color: progressColor }}>
                     {progress}%
                   </span>
-                  <span className="text-[11px] px-1.5 py-0.5 rounded-md bg-zinc-100 dark:bg-zinc-700 text-zinc-600 dark:text-zinc-400">
+                  <span className="text-[10px] px-1 py-px rounded bg-zinc-100 dark:bg-zinc-700 text-zinc-500 dark:text-zinc-400 truncate">
                     {subtitle}
                   </span>
                   {badge && (
-                    <span className="text-[11px] font-medium px-1.5 py-0.5 rounded-md" style={{ backgroundColor: badge.color + '18', color: badge.color }}>
+                    <span className="text-[10px] font-medium px-1 py-px rounded shrink-0" style={{ backgroundColor: badge.color + '18', color: badge.color }}>
                       {badge.value.toFixed(1)}x
                     </span>
                   )}
