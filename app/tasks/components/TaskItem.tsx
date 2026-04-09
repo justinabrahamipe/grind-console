@@ -116,7 +116,30 @@ const TaskItem = memo(function TaskItem({
     if (target <= 0) return liveValue > 0 ? 100 : 0;
     return Math.min((liveValue / target) * 100, 100);
   })();
-  const progressColor = isOverLimit ? '#ef4444' : progressPct > 0 ? getProgressColor(progressPct) : 'transparent';
+
+  // For outcome goal tasks, determine if the goal is on track vs expected
+  const outcomeOnTrack = (() => {
+    if (!task.goalId) return null;
+    const goal = goalsList.find(g => g.id === task.goalId);
+    if (!goal || goal.goalType !== 'outcome' || !goal.startDate || !goal.targetDate) return null;
+    const taskDate = task.startDate || getTodayString();
+    if (taskDate < goal.startDate || taskDate > goal.targetDate) return null;
+    const sched: number[] = parseScheduleDays(goal.scheduleDays);
+    const total = sched.length > 0
+      ? countScheduledDaysInRange(goal.startDate, goal.targetDate, sched)
+      : Math.max(1, Math.round((new Date(goal.targetDate).getTime() - new Date(goal.startDate).getTime()) / 86400000));
+    const elapsed = sched.length > 0
+      ? countScheduledDaysInRange(goal.startDate, taskDate, sched)
+      : Math.max(0, Math.round((new Date(taskDate).getTime() - new Date(goal.startDate).getTime()) / 86400000));
+    const expected = Math.round((goal.startValue + (goal.targetValue - goal.startValue) * (elapsed / total)) * 10) / 10;
+    const isDecrease = goal.targetValue < goal.startValue;
+    return isDecrease ? goal.currentValue <= expected : goal.currentValue >= expected;
+  })();
+
+  const progressColor = isOverLimit ? '#ef4444'
+    : outcomeOnTrack === true ? '#22C55E'
+    : outcomeOnTrack === false ? '#EF4444'
+    : progressPct > 0 ? getProgressColor(progressPct) : 'transparent';
 
   const swipeThreshold = typeof window !== 'undefined' ? window.innerWidth * 0.3 : 120;
   const canSwipe = !isTaskLoading;
@@ -372,10 +395,8 @@ const TaskItem = memo(function TaskItem({
                 ? countScheduledDaysInRange(goal.startDate, taskDate, sched)
                 : Math.max(0, Math.round((new Date(taskDate).getTime() - new Date(goal.startDate).getTime()) / 86400000));
               const expected = Math.round((goal.startValue + (goal.targetValue - goal.startValue) * (elapsed / total)) * 10) / 10;
-              const isDecrease = goal.targetValue < goal.startValue;
-              const onTrack = isDecrease ? goal.currentValue <= expected : goal.currentValue >= expected;
               return (
-                <span className={`text-[10px] shrink-0 ${onTrack ? 'text-green-500 dark:text-green-400' : 'text-red-500 dark:text-red-400'}`}>
+                <span className={`text-[10px] shrink-0 ${outcomeOnTrack ? 'text-green-500 dark:text-green-400' : 'text-red-500 dark:text-red-400'}`}>
                   exp: {expected} {goal.unit}
                 </span>
               );
