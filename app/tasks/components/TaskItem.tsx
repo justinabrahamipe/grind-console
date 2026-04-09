@@ -137,10 +137,13 @@ const TaskItem = memo(function TaskItem({
     return isDecrease ? (goal.currentValue ?? 0) <= expected : (goal.currentValue ?? 0) >= expected;
   })();
 
+  // For outcome/target goal tasks, goal status takes priority over task completion
+  // (completing the task just means logging a value, not that the value is good)
+  // For non-goal tasks, task completion = green
   const progressColor = isOverLimit ? '#ef4444'
-    : isFullyDone ? '#22C55E'
     : outcomeOnTrack === true ? '#22C55E'
     : outcomeOnTrack === false ? '#EF4444'
+    : isFullyDone ? '#22C55E'
     : progressPct > 0 ? getProgressColor(progressPct) : 'transparent';
 
   const swipeThreshold = typeof window !== 'undefined' ? window.innerWidth * 0.3 : 120;
