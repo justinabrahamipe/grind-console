@@ -15,7 +15,7 @@ interface HabitTrackerProps {
 const CELL_SIZE = 14; // w-3.5 = 14px
 const CELL_GAP = 2;  // gap-0.5 = 2px
 const PCT_W = 44; // w-11
-const NAME_MIN = 100; // minimum space for habit name
+const NAME_MIN = 140; // minimum space for habit name
 const ML_GAP = 8; // ml-2
 
 export default function HabitTracker({ outcomesData, completionDates, today }: HabitTrackerProps) {
