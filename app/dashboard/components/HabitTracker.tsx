@@ -15,34 +15,64 @@ export default function HabitTracker({ outcomesData, completionDates, today }: H
   const habitGoals = outcomesData.filter(o => o.goalType === 'habitual');
   if (habitGoals.length === 0) return null;
 
+  const days = useMemo(() => {
+    const arr: string[] = [];
+    const now = new Date();
+    for (let i = 13; i >= 0; i--) {
+      const d = new Date(now);
+      d.setDate(d.getDate() - i);
+      arr.push(d.toISOString().split('T')[0]);
+    }
+    return arr;
+  }, []);
+
+  const dayLabels = useMemo(() => days.map(d => {
+    const date = new Date(d + 'T12:00:00');
+    return ['S','M','T','W','T','F','S'][date.getDay()];
+  }), [days]);
+
   return (
     <div className="bg-white dark:bg-zinc-800 rounded-2xl shadow-sm border border-zinc-200 dark:border-zinc-700 p-4 mb-6">
-      <div className="flex items-center gap-2 mb-4">
-        <FaFire className="text-lg text-orange-500" />
-        <h2 className="text-lg font-semibold text-zinc-900 dark:text-white">Habits</h2>
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2">
+          <FaFire className="text-lg text-orange-500" />
+          <h2 className="text-lg font-semibold text-zinc-900 dark:text-white">Habits</h2>
+        </div>
+        <div className="flex items-center gap-2 text-[10px] text-zinc-400 dark:text-zinc-500">
+          <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-green-500 inline-block" /> Hit</span>
+          <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-amber-400 inline-block" /> Partial</span>
+          <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-blue-400 inline-block" /> Today</span>
+          <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-red-400 inline-block" /> Miss</span>
+          <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-zinc-200 dark:bg-zinc-700 inline-block" /> Rest</span>
+        </div>
       </div>
-      <div className="space-y-4">
+
+      {/* Day labels row */}
+      <div className="flex items-center gap-0 mb-1">
+        <div className="w-28 shrink-0" />
+        <div className="flex gap-0.5">
+          {dayLabels.map((label, i) => (
+            <div key={i} className="w-3 text-[9px] text-zinc-400 dark:text-zinc-500 text-center">{label}</div>
+          ))}
+        </div>
+        <div className="w-10 shrink-0" />
+      </div>
+
+      {/* Goal rows */}
+      <div className="space-y-1.5">
         {habitGoals.map(goal => (
-          <HabitRow key={goal.id} goal={goal} completionDates={completionDates} today={today} />
+          <HabitRow key={goal.id} goal={goal} completionDates={completionDates} today={today} days={days} />
         ))}
-      </div>
-      <div className="flex items-center gap-1.5 mt-3 text-[10px] text-zinc-400 dark:text-zinc-500">
-        <span className="w-2.5 h-2.5 rounded-sm bg-green-500 inline-block" /> <span>Hit</span>
-        <span className="w-2.5 h-2.5 rounded-sm bg-amber-400 inline-block ml-1" /> <span>Partial</span>
-        <span className="w-2.5 h-2.5 rounded-sm bg-blue-400 inline-block ml-1" /> <span>Today</span>
-        <span className="w-2.5 h-2.5 rounded-sm bg-red-400 inline-block ml-1" /> <span>Miss</span>
-        <span className="w-2.5 h-2.5 rounded-sm bg-zinc-200 dark:bg-zinc-700 inline-block ml-1" /> <span>Off</span>
       </div>
     </div>
   );
 }
 
-function HabitRow({ goal, completionDates, today }: { goal: OutcomeData; completionDates: Record<number, { date: string; value: number; completed: boolean }[]>; today: string }) {
+function HabitRow({ goal, completionDates, today, days }: { goal: OutcomeData; completionDates: Record<number, { date: string; value: number; completed: boolean }[]>; today: string; days: string[] }) {
   const scheduleDays: number[] = parseScheduleDays(goal.scheduleDays);
   const entries = completionDates[goal.id] || [];
 
-  const { weeks, adherence } = useMemo(() => {
-    // Build value map
+  const { cells, adherence } = useMemo(() => {
     const dateValues = new Map<string, number>();
     const postponedSet = new Set<string>();
     for (const e of entries) {
@@ -53,59 +83,26 @@ function HabitRow({ goal, completionDates, today }: { goal: OutcomeData; complet
       }
     }
 
-    // Build days array — last 8 weeks (56 days)
-    const todayDate = new Date(today + 'T12:00:00');
-    const startDate = new Date(todayDate);
-    startDate.setDate(startDate.getDate() - 55);
-    // Align to Monday
-    const startDow = startDate.getDay();
-    const mondayOffset = startDow === 0 ? 6 : startDow - 1;
-    startDate.setDate(startDate.getDate() - mondayOffset);
-
-    type DayInfo = { date: string; status: 'done' | 'partial' | 'missed' | 'today' | 'future' | 'off' | 'postponed' | 'before'; dayOfWeek: number };
-    const weeksArr: DayInfo[][] = [];
-    let currentWeek: DayInfo[] = [];
-
-    const d = new Date(startDate);
-    while (d <= todayDate || currentWeek.length > 0 && currentWeek.length < 7) {
-      const dateStr = d.toISOString().split('T')[0];
+    const cellData = days.map(dateStr => {
+      const d = new Date(dateStr + 'T12:00:00');
       const dow = d.getDay();
-      const mondayDow = dow === 0 ? 6 : dow - 1;
       const isScheduled = scheduleDays.length === 0 || scheduleDays.includes(dow);
       const isBeforeStart = goal.startDate && dateStr < goal.startDate;
       const isFuture = dateStr > today;
 
-      let status: DayInfo['status'];
-      if (isBeforeStart || isFuture) {
-        status = isFuture ? 'future' : 'before';
-      } else if (!isScheduled) {
-        status = 'off';
-      } else if (dateValues.has(dateStr)) {
+      if (isBeforeStart || isFuture) return 'future';
+      if (!isScheduled) return 'off';
+      if (dateValues.has(dateStr)) {
         const val = dateValues.get(dateStr) || 0;
-        if (goal.dailyTarget && goal.completionType !== 'checkbox' && val < goal.dailyTarget) {
-          status = 'partial';
-        } else {
-          status = 'done';
-        }
-      } else if (postponedSet.has(dateStr)) {
-        status = 'postponed';
-      } else if (dateStr === today) {
-        status = 'today';
-      } else {
-        status = 'missed';
+        if (goal.dailyTarget && goal.completionType !== 'checkbox' && val < goal.dailyTarget) return 'partial';
+        return 'done';
       }
+      if (postponedSet.has(dateStr)) return 'off';
+      if (dateStr === today) return 'today';
+      return 'missed';
+    });
 
-      if (mondayDow === 0 && currentWeek.length > 0) {
-        weeksArr.push(currentWeek);
-        currentWeek = [];
-      }
-      currentWeek.push({ date: dateStr, status, dayOfWeek: dow });
-      d.setDate(d.getDate() + 1);
-      if (d > todayDate && currentWeek.length === 7) break;
-    }
-    if (currentWeek.length > 0) weeksArr.push(currentWeek);
-
-    // Calculate adherence
+    // Adherence
     const adhStart = goal.startDate && goal.startDate <= today ? goal.startDate : today;
     let exp = 0;
     const iter = new Date(adhStart + 'T00:00:00');
@@ -126,10 +123,8 @@ function HabitRow({ goal, completionDates, today }: { goal: OutcomeData; complet
     }
     const adh = exp > 0 ? Math.round((h / exp) * 100) : 0;
 
-    return { weeks: weeksArr, adherence: adh };
-  }, [entries, today, goal.startDate, goal.dailyTarget, goal.completionType, scheduleDays]);
-
-  const dayLabels = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
+    return { cells: cellData, adherence: adh };
+  }, [entries, today, days, goal.startDate, goal.dailyTarget, goal.completionType, scheduleDays]);
 
   const getCellClass = (status: string) => {
     switch (status) {
@@ -137,43 +132,26 @@ function HabitRow({ goal, completionDates, today }: { goal: OutcomeData; complet
       case 'partial': return 'bg-amber-400';
       case 'today': return 'bg-blue-400 dark:bg-blue-500 ring-1 ring-blue-500/50';
       case 'missed': return 'bg-red-400 dark:bg-red-500/70';
-      case 'off': case 'postponed': return 'bg-zinc-200 dark:bg-zinc-700';
+      case 'off': return 'bg-zinc-200 dark:bg-zinc-700';
       default: return 'bg-zinc-100 dark:bg-zinc-800 opacity-30';
     }
   };
 
   return (
-    <div>
-      <div className="flex items-center gap-2 mb-1.5">
+    <div className="flex items-center gap-0">
+      <div className="w-28 shrink-0 flex items-center gap-1.5 min-w-0">
         {goal.pillarEmoji && <span className="text-xs">{goal.pillarEmoji}</span>}
-        <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300 truncate">{goal.name}</span>
-        <span className={`text-xs font-semibold ml-auto ${
+        <span className="text-xs font-medium text-zinc-700 dark:text-zinc-300 truncate">{goal.name}</span>
+      </div>
+      <div className="flex gap-0.5">
+        {cells.map((status, i) => (
+          <div key={i} className={`w-3 h-3 rounded-sm ${getCellClass(status)}`} />
+        ))}
+      </div>
+      <div className="w-10 shrink-0 text-right">
+        <span className={`text-[11px] font-semibold ${
           adherence >= 80 ? 'text-green-500' : adherence >= 50 ? 'text-amber-500' : 'text-red-500'
         }`}>{adherence}%</span>
-      </div>
-      <div className="overflow-x-auto">
-        <div className="flex gap-0.5">
-          <div className="flex flex-col gap-0.5 mr-1">
-            {dayLabels.map((label, i) => (
-              <div key={i} className="w-3 h-3 text-[9px] text-zinc-400 dark:text-zinc-500 flex items-center justify-center">
-                {i % 2 === 0 ? label : ''}
-              </div>
-            ))}
-          </div>
-          {weeks.map((week, wi) => (
-            <div key={wi} className="flex flex-col gap-0.5">
-              {week.map((day, di) => (
-                <div
-                  key={di}
-                  title={`${new Date(day.date + 'T12:00:00').toLocaleDateString(undefined, { month: 'short', day: 'numeric' })} — ${
-                    day.status === 'done' ? 'Done' : day.status === 'partial' ? 'Partial' : day.status === 'today' ? 'In progress' : day.status === 'missed' ? 'Missed' : day.status === 'off' ? 'Off day' : day.status === 'postponed' ? 'Postponed' : 'Upcoming'
-                  }`}
-                  className={`w-3 h-3 rounded-sm ${getCellClass(day.status)}`}
-                />
-              ))}
-            </div>
-          ))}
-        </div>
       </div>
     </div>
   );
