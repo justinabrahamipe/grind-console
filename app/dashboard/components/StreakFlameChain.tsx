@@ -59,7 +59,7 @@ export default function StreakFlameChain({ scores, currentStreak }: StreakFlameC
           </span>
         </div>
       </div>
-      <div className="flex items-center justify-between gap-0.5 md:gap-1 overflow-x-auto">
+      <div className="flex items-center justify-around gap-0.5 md:gap-1">
         {days.map((day, i) => (
           <div key={i} className="flex flex-col items-center gap-0.5 md:gap-1 min-w-0 shrink-0">
             <span className="text-[9px] md:text-[10px] text-zinc-400 dark:text-zinc-500">
