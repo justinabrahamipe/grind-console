@@ -138,6 +138,7 @@ const TaskItem = memo(function TaskItem({
   })();
 
   const progressColor = isOverLimit ? '#ef4444'
+    : isFullyDone ? '#22C55E'
     : outcomeOnTrack === true ? '#22C55E'
     : outcomeOnTrack === false ? '#EF4444'
     : progressPct > 0 ? getProgressColor(progressPct) : 'transparent';
