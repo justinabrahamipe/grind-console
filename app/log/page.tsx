@@ -31,7 +31,7 @@ export default function LogPage() {
   const searchInputRef = useRef<HTMLInputElement>(null);
   const [quickNote, setQuickNote] = useState("");
   const [quickSaving, setQuickSaving] = useState(false);
-  const quickInputRef = useRef<HTMLInputElement>(null);
+  const quickInputRef = useRef<HTMLTextAreaElement>(null);
 
   const fetchLogs = useCallback(async () => {
     try {
@@ -84,6 +84,7 @@ export default function LogPage() {
         const newLog = await res.json();
         setLogs(prev => sortAsc ? [...prev, newLog] : [newLog, ...prev]);
         setQuickNote("");
+        if (quickInputRef.current) quickInputRef.current.style.height = 'auto';
       }
     } catch (err) {
       console.error("Quick log failed:", err);
@@ -170,22 +171,33 @@ export default function LogPage() {
         </div>
 
         {/* Quick Log */}
-        <div className="flex gap-2 mb-3">
-          <input
+        <div className="flex gap-2 mb-3 items-end">
+          <textarea
             ref={quickInputRef}
-            type="text"
             value={quickNote}
-            onChange={e => setQuickNote(e.target.value)}
-            onKeyDown={e => { if (e.key === "Enter") handleQuickLog(); }}
+            onChange={e => {
+              setQuickNote(e.target.value);
+              e.target.style.height = 'auto';
+              e.target.style.height = e.target.scrollHeight + 'px';
+            }}
+            onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleQuickLog(); } }}
             placeholder="Quick log..."
-            className="flex-1 px-3 py-2.5 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-sm text-zinc-900 dark:text-white placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-300 dark:focus:ring-zinc-600"
+            rows={1}
+            className="flex-1 px-3 py-2.5 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-sm text-zinc-900 dark:text-white placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-300 dark:focus:ring-zinc-600 resize-none overflow-hidden"
           />
           <button
             onClick={handleQuickLog}
             disabled={!quickNote.trim() || quickSaving}
-            className="px-3 py-2.5 rounded-lg bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 hover:bg-zinc-800 dark:hover:bg-zinc-100 disabled:opacity-50 transition-colors"
+            className="px-3 py-2.5 rounded-lg bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 hover:bg-zinc-800 dark:hover:bg-zinc-100 disabled:opacity-50 transition-colors shrink-0"
           >
-            <FaPlus className="text-sm" />
+            {quickSaving ? (
+              <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+              </svg>
+            ) : (
+              <FaPlus className="text-sm" />
+            )}
           </button>
         </div>
 
