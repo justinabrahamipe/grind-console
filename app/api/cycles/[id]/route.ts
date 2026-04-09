@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getAuthenticatedUserId, errorResponse } from "@/lib/api-utils";
+import { getAuthenticatedUserId, errorResponse, parseId } from "@/lib/api-utils";
 import { db, cycles, goals, taskSchedules, pillars } from "@/lib/db";
 import { eq, and } from "drizzle-orm";
 import { calculateEndDate } from "@/lib/cycle-scoring";
@@ -13,7 +13,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     const userId = await getAuthenticatedUserId();
 
     const { id } = await params;
-    const periodId = parseInt(id);
+    const periodId = parseId(id);
 
     const cycle = await getOwnedCycle(periodId, userId);
     if (!cycle) {
@@ -74,7 +74,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
     const userId = await getAuthenticatedUserId();
 
     const { id } = await params;
-    const periodId = parseInt(id);
+    const periodId = parseId(id);
     const body = await request.json();
 
     const existing = await getOwnedCycle(periodId, userId);
@@ -110,7 +110,7 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
     const userId = await getAuthenticatedUserId();
 
     const { id } = await params;
-    const periodId = parseInt(id);
+    const periodId = parseId(id);
 
     const deleted = await db
       .delete(cycles)

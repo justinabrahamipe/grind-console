@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getAuthenticatedUserId, errorResponse } from "@/lib/api-utils";
+import { getAuthenticatedUserId, errorResponse, parseId } from "@/lib/api-utils";
 import { db, tasks, taskSchedules } from "@/lib/db";
 import { invalidateTaskCache } from "@/lib/ensure-upcoming-tasks";
 import { eq, and } from "drizzle-orm";
@@ -16,7 +16,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     const userId = await getAuthenticatedUserId();
 
     const { id } = await params;
-    const taskId = parseInt(id);
+    const taskId = parseId(id);
 
     // Check if this is a schedule ID (for edit views) or task instance ID
     const type = new URL(request.url).searchParams.get('type');
@@ -74,7 +74,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
     const userId = await getAuthenticatedUserId();
 
     const { id } = await params;
-    const itemId = parseInt(id);
+    const itemId = parseId(id);
     const body = await request.json();
 
     // Check if updating a task instance (e.g., moving date) or a schedule
@@ -181,7 +181,7 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
     const userId = await getAuthenticatedUserId();
 
     const { id } = await params;
-    const itemId = parseInt(id);
+    const itemId = parseId(id);
 
     // Check if this is a schedule
     const [schedule] = await db

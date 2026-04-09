@@ -14,32 +14,35 @@ export async function GET(request: NextRequest) {
     const pillarId = params.get('pillarId');
     const taskId = params.get('taskId');
     const search = params.get('search');
-    const limit = parseInt(params.get('limit') || '50');
-    const offset = parseInt(params.get('offset') || '0');
+    const limit = Math.min(Math.max(parseInt(params.get('limit') || '50', 10) || 50, 1), 500);
+    const offset = Math.max(parseInt(params.get('offset') || '0', 10) || 0, 0);
 
+    const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+    const isValidDate = (d: string | null) => d && dateRegex.test(d);
     const conditions = [eq(activityLog.userId, userId)];
 
-    if (date) {
-      // Filter by specific date -- match timestamp range for that day
+    if (isValidDate(date)) {
       const dayStart = new Date(date + 'T00:00:00');
       const dayEnd = new Date(date + 'T23:59:59');
       conditions.push(gte(activityLog.timestamp, dayStart));
       conditions.push(lte(activityLog.timestamp, dayEnd));
-    } else {
-      if (from) {
+    } else if (!date) {
+      if (isValidDate(from)) {
         conditions.push(gte(activityLog.timestamp, new Date(from + 'T00:00:00')));
       }
-      if (to) {
+      if (isValidDate(to)) {
         conditions.push(lte(activityLog.timestamp, new Date(to + 'T23:59:59')));
       }
     }
 
     if (pillarId) {
-      conditions.push(eq(activityLog.pillarId, parseInt(pillarId)));
+      const pid = parseInt(pillarId, 10);
+      if (!isNaN(pid) && pid > 0) conditions.push(eq(activityLog.pillarId, pid));
     }
 
     if (taskId) {
-      conditions.push(eq(activityLog.taskId, parseInt(taskId)));
+      const tid = parseInt(taskId, 10);
+      if (!isNaN(tid) && tid > 0) conditions.push(eq(activityLog.taskId, tid));
     }
 
     // Build the query with joins (no longer joining outcomeLogs)

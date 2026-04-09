@@ -58,7 +58,8 @@ export const userPreferences = sqliteTable('UserPreferences', {
   theme: text('theme').notNull().default('light'),
   timeFormat: text('timeFormat').notNull().default('12h'),
   dateFormat: text('dateFormat').notNull().default('DD/MM/YYYY'),
-  apiKey: text('apiKey'), // null = disabled, value = active key
+  apiKey: text('apiKey'), // deprecated: cleared on first use, replaced by apiKeyHash
+  apiKeyHash: text('apiKeyHash'), // SHA-256 hash of the API key
   streakThreshold: integer('streakThreshold').notNull().default(95), // minimum action score % to count as a streak day
   habitualColor: text('habitualColor').notNull().default('#3B82F6'), // blue
   targetColor: text('targetColor').notNull().default('#F59E0B'), // amber

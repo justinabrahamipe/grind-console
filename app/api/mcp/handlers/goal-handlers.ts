@@ -21,7 +21,7 @@ export async function handleCreateGoal(args: any, userId: string): Promise<strin
     return "Error: targetValue is required for outcome/target goals.";
   }
 
-  const pillarId = args.pillarId ? parseInt(args.pillarId) : null;
+  const pillarId = args.pillarId ? (parseInt(args.pillarId, 10) || null) : null;
   if (pillarId) {
     const p = await getOwnedPillar(pillarId, userId);
     if (!p) return "Error: Pillar not found.";
@@ -32,7 +32,8 @@ export async function handleCreateGoal(args: any, userId: string): Promise<strin
 
   // For activity goals with a period, derive dates from the cycle
   if (isActivityGoal && args.periodId) {
-    const [cycle] = await db.select().from(cycles).where(eq(cycles.id, parseInt(args.periodId)));
+    const periodIdNum = parseInt(args.periodId, 10);
+    const [cycle] = periodIdNum ? await db.select().from(cycles).where(eq(cycles.id, periodIdNum)) : [];
     if (cycle) {
       if (!startDate) startDate = cycle.startDate;
       if (!targetDate) targetDate = cycle.endDate;
@@ -52,7 +53,7 @@ export async function handleCreateGoal(args: any, userId: string): Promise<strin
     pillarId,
     startDate,
     targetDate,
-    periodId: args.periodId ? parseInt(args.periodId) : null,
+    periodId: args.periodId ? (parseInt(args.periodId, 10) || null) : null,
     goalType,
     completionType: args.completionType || 'checkbox',
     dailyTarget: args.dailyTarget ?? null,
@@ -74,8 +75,8 @@ export async function handleCreateGoal(args: any, userId: string): Promise<strin
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function handleEditGoal(args: any, userId: string): Promise<string> {
-  const goalId = parseInt(args.goalId);
-  if (!goalId) return "Error: goalId is required.";
+  const goalId = parseInt(args.goalId, 10);
+  if (isNaN(goalId) || goalId <= 0) return "Error: goalId is required.";
 
   const existing = await getOwnedGoal(goalId, userId);
   if (!existing) return "Error: Goal not found.";

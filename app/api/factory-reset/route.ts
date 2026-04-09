@@ -3,11 +3,18 @@ import { auth } from "@/auth";
 import { db, pillars, taskSchedules, tasks, goals, cycles, dailyScores, activityLog, userPreferences } from "@/lib/db";
 import { eq } from "drizzle-orm";
 import { seedDefaultData } from "@/lib/seed-data";
+import { rateLimit } from "@/lib/rate-limit";
 
 export async function POST(request: Request) {
   const session = await auth();
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  // Strict rate limit on destructive endpoint: 3 per hour
+  const rl = rateLimit(`reset:${session.user.id}`, 3, 3600_000);
+  if (!rl.allowed) {
+    return NextResponse.json({ error: "Rate limit exceeded. Try again later." }, { status: 429 });
   }
 
   const userId = session.user.id;

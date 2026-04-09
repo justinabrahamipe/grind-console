@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { motion } from "framer-motion";
-import { FaClock, FaCalendar, FaCheck, FaCog, FaDatabase, FaTrash, FaDownload, FaExclamationTriangle, FaTasks, FaColumns, FaKey, FaCopy, FaFire, FaPalette, FaCrown } from "react-icons/fa";
+import { FaClock, FaCalendar, FaCheck, FaCog, FaDatabase, FaTrash, FaDownload, FaExclamationTriangle, FaTasks, FaColumns, FaKey, FaCopy, FaFire, FaPalette, FaCrown, FaEye, FaEyeSlash } from "react-icons/fa";
 import { useSession } from "next-auth/react";
 import { useTheme } from "@/components/ThemeProvider";
 import { Snackbar, Alert as MuiAlert } from "@mui/material";
@@ -30,6 +30,8 @@ export default function SettingsPage() {
   const [promoInput, setPromoInput] = useState("");
   const [promoLoading, setPromoLoading] = useState(false);
   const [apiKey, setApiKey] = useState<string | null>(null);
+  const [apiKeyVisible, setApiKeyVisible] = useState(false);
+  const apiKeyTimerRef = useRef<NodeJS.Timeout | null>(null);
   const [apiKeyCopied, setApiKeyCopied] = useState(false);
   const [apiLinkCopied, setApiLinkCopied] = useState(false);
   const [mcpLinkCopied, setMcpLinkCopied] = useState(false);
@@ -471,9 +473,24 @@ export default function SettingsPage() {
               {apiKey ? (
                 <div className="space-y-3">
                   <div className="flex items-center gap-2">
-                    <code className="flex-1 px-3 py-2 bg-zinc-100 dark:bg-zinc-900 rounded-lg text-xs text-zinc-700 dark:text-zinc-300 font-mono truncate">
-                      {apiKey}
+                    <code className="flex-1 px-3 py-2 bg-zinc-100 dark:bg-zinc-900 rounded-lg text-xs text-zinc-700 dark:text-zinc-300 font-mono truncate select-none">
+                      {apiKeyVisible ? apiKey : apiKey.slice(0, 6) + '••••••••••••••••••••'}
                     </code>
+                    <button
+                      onClick={() => {
+                        if (apiKeyTimerRef.current) clearTimeout(apiKeyTimerRef.current);
+                        if (!apiKeyVisible) {
+                          setApiKeyVisible(true);
+                          apiKeyTimerRef.current = setTimeout(() => setApiKeyVisible(false), 5000);
+                        } else {
+                          setApiKeyVisible(false);
+                        }
+                      }}
+                      className="p-2 rounded-lg text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-700 shrink-0"
+                      title={apiKeyVisible ? "Hide key" : "Show key (5s)"}
+                    >
+                      {apiKeyVisible ? <FaEyeSlash /> : <FaEye />}
+                    </button>
                     <button
                       onClick={() => { navigator.clipboard.writeText(apiKey); setApiKeyCopied(true); setTimeout(() => setApiKeyCopied(false), 2000); }}
                       className="p-2 rounded-lg text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-700 shrink-0"
@@ -496,7 +513,7 @@ export default function SettingsPage() {
                         {apiLinkCopied ? <><FaCheck className="text-green-500" /> Copied</> : <><FaCopy /> Copy link</>}
                       </button>
                     </div>
-                    <code className="block truncate">{typeof window !== 'undefined' ? window.location.origin : ''}/api/locations/public?key={apiKey}</code>
+                    <code className="block truncate">{typeof window !== 'undefined' ? window.location.origin : ''}/api/locations/public?key={apiKeyVisible ? apiKey : apiKey.slice(0, 6) + '••••'}</code>
                     <p className="mt-2">Params: <code>section=all|logs|tasks|goals|scores|pillars</code>, <code>format=text|json</code>, <code>search=</code>, <code>from=</code>, <code>to=</code></p>
 
                     <div className="flex items-center justify-between gap-2 mt-3 pt-3 border-t border-zinc-200 dark:border-zinc-700">
@@ -512,14 +529,14 @@ export default function SettingsPage() {
                         {mcpLinkCopied ? <><FaCheck className="text-green-500" /> Copied</> : <><FaCopy /> Copy link</>}
                       </button>
                     </div>
-                    <code className="block truncate">{typeof window !== 'undefined' ? window.location.origin : ''}/api/mcp?key={apiKey}</code>
+                    <code className="block truncate">{typeof window !== 'undefined' ? window.location.origin : ''}/api/mcp?key={apiKeyVisible ? apiKey : apiKey.slice(0, 6) + '••••'}</code>
                     <p className="mt-1">Add this as a custom connector in Claude.ai (Settings → Connectors → Add custom connector)</p>
                   </div>
                   <div className="flex gap-2">
                     <button
                       onClick={async () => {
                         const res = await fetch("/api/settings/api-key", { method: "POST" });
-                        if (res.ok) { const d = await res.json(); setApiKey(d.apiKey); setSnackbar({ open: true, message: "API key regenerated", severity: "success" }); }
+                        if (res.ok) { const d = await res.json(); setApiKey(d.apiKey); setApiKeyVisible(true); if (apiKeyTimerRef.current) clearTimeout(apiKeyTimerRef.current); apiKeyTimerRef.current = setTimeout(() => setApiKeyVisible(false), 5000); setSnackbar({ open: true, message: "API key regenerated — visible for 5 seconds", severity: "success" }); }
                       }}
                       className="px-3 py-2 text-sm rounded-lg bg-zinc-200 dark:bg-zinc-700 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-300 dark:hover:bg-zinc-600"
                     >
@@ -540,7 +557,7 @@ export default function SettingsPage() {
                 <button
                   onClick={async () => {
                     const res = await fetch("/api/settings/api-key", { method: "POST" });
-                    if (res.ok) { const d = await res.json(); setApiKey(d.apiKey); setSnackbar({ open: true, message: "API access enabled", severity: "success" }); }
+                    if (res.ok) { const d = await res.json(); setApiKey(d.apiKey); setApiKeyVisible(true); if (apiKeyTimerRef.current) clearTimeout(apiKeyTimerRef.current); apiKeyTimerRef.current = setTimeout(() => setApiKeyVisible(false), 5000); setSnackbar({ open: true, message: "API access enabled — key visible for 5 seconds", severity: "success" }); }
                   }}
                   className="px-4 py-3 bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 hover:bg-zinc-800 dark:hover:bg-zinc-200 font-semibold rounded-lg transition-all flex items-center gap-2"
                 >

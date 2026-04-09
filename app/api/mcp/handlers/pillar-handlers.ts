@@ -25,7 +25,7 @@ export async function handleCreatePillar(args: any, userId: string): Promise<str
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function handleEditPillar(args: any, userId: string): Promise<string> {
-  const pillarId = parseInt(args.pillarId);
+  const pillarId = parseInt(args.pillarId, 10);
   if (!pillarId) return "Error: pillarId is required.";
 
   const existing = await getOwnedPillar(pillarId, userId);
@@ -59,7 +59,7 @@ export async function handleCreateCycle(args: any, userId: string): Promise<stri
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function handleEditCycle(args: any, userId: string): Promise<string> {
-  const cycleId = parseInt(args.cycleId);
+  const cycleId = parseInt(args.cycleId, 10);
   if (!cycleId) return "Error: cycleId is required.";
 
   const existing = await getOwnedCycle(cycleId, userId);
