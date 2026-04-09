@@ -155,8 +155,8 @@ function HabitRow({ goal, completionDates, today }: { goal: OutcomeData; complet
     <div ref={containerRef}>
       {/* Day labels */}
       <div className="flex items-center mb-0.5">
-        <div className="w-28 md:w-48 shrink-0" />
-        <div className="flex gap-0.5 ml-auto">
+        <div className="flex-1 min-w-0" />
+        <div className="flex gap-0.5 shrink-0">
           {dayLabels.map((label, i) => (
             <div key={i} className="w-3.5 text-[9px] text-zinc-400 dark:text-zinc-500 text-center">{label}</div>
           ))}
@@ -165,11 +165,11 @@ function HabitRow({ goal, completionDates, today }: { goal: OutcomeData; complet
       </div>
       {/* Habit row */}
       <div className="flex items-center">
-        <div className="w-28 md:w-48 shrink-0 flex items-center gap-1.5 min-w-0">
-          {goal.pillarEmoji && <span className="text-xs">{goal.pillarEmoji}</span>}
+        <div className="flex-1 min-w-0 flex items-center gap-1.5">
+          {goal.pillarEmoji && <span className="text-xs shrink-0">{goal.pillarEmoji}</span>}
           <span className="text-xs font-medium text-zinc-700 dark:text-zinc-300 truncate">{goal.name}</span>
         </div>
-        <div className="flex gap-0.5 ml-auto">
+        <div className="flex gap-0.5 shrink-0 ml-2">
           {cells.map((status, i) => (
             <div key={i} className={`w-3.5 h-3.5 rounded-sm shrink-0 ${getCellClass(status)}`} />
           ))}
