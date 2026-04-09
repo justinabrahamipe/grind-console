@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useRef, useEffect } from "react";
+import { useMemo, useRef, useEffect, useState } from "react";
 import { FaFire } from "react-icons/fa";
 import Link from "next/link";
 import type { OutcomeData } from "@/lib/types";
@@ -14,20 +14,20 @@ interface HabitTrackerProps {
 
 const CELL_SIZE = 14; // w-3.5 = 14px
 const CELL_GAP = 2;  // gap-0.5 = 2px
-const NAME_W_MOBILE = 112; // w-28
-const NAME_W_DESKTOP = 192; // w-48
 const PCT_W = 44; // w-11
-const PADDING = 32; // p-4 * 2
 
-function useAvailableDays(containerRef: React.RefObject<HTMLDivElement | null>) {
+export default function HabitTracker({ outcomesData, completionDates, today }: HabitTrackerProps) {
+  const habitGoals = outcomesData.filter(o => o.goalType === 'habitual');
+  if (habitGoals.length === 0) return null;
+
+  const containerRef = useRef<HTMLDivElement>(null);
   const [dayCount, setDayCount] = useState(14);
 
   useEffect(() => {
     const calculate = () => {
       if (!containerRef.current) return;
       const totalWidth = containerRef.current.offsetWidth;
-      const nameW = window.innerWidth >= 768 ? NAME_W_DESKTOP : NAME_W_MOBILE;
-      const available = totalWidth - nameW - PCT_W;
+      const available = totalWidth - PCT_W;
       const count = Math.max(7, Math.floor((available + CELL_GAP) / (CELL_SIZE + CELL_GAP)));
       setDayCount(count);
     };
@@ -35,17 +35,25 @@ function useAvailableDays(containerRef: React.RefObject<HTMLDivElement | null>) 
     const observer = new ResizeObserver(calculate);
     if (containerRef.current) observer.observe(containerRef.current);
     return () => observer.disconnect();
-  }, [containerRef]);
+  }, []);
 
-  return dayCount;
-}
+  const days = useMemo(() => {
+    const arr: string[] = [];
+    const now = new Date();
+    for (let i = dayCount - 1; i >= 0; i--) {
+      const d = new Date(now);
+      d.setDate(d.getDate() - i);
+      arr.push(d.toISOString().split('T')[0]);
+    }
+    return arr;
+  }, [dayCount]);
 
-export default function HabitTracker({ outcomesData, completionDates, today }: HabitTrackerProps) {
-  const habitGoals = outcomesData.filter(o => o.goalType === 'habitual');
-  if (habitGoals.length === 0) return null;
+  const dayLabels = useMemo(() => days.map(d =>
+    ['S','M','T','W','T','F','S'][new Date(d + 'T12:00:00').getDay()]
+  ), [days]);
 
   return (
-    <div className="bg-white dark:bg-zinc-800 rounded-2xl shadow-sm border border-zinc-200 dark:border-zinc-700 p-4 mb-6">
+    <div ref={containerRef} className="bg-white dark:bg-zinc-800 rounded-2xl shadow-sm border border-zinc-200 dark:border-zinc-700 p-4 mb-6">
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
           <FaFire className="text-lg text-orange-500" />
@@ -59,33 +67,33 @@ export default function HabitTracker({ outcomesData, completionDates, today }: H
           <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-zinc-200 dark:bg-zinc-700 inline-block" /> Rest</span>
         </div>
       </div>
+
+      {/* Day labels — once */}
+      <div className="flex items-center mb-1">
+        <div className="flex-1 min-w-0" />
+        <div className="flex gap-0.5 shrink-0">
+          {dayLabels.map((label, i) => (
+            <div key={i} className="w-3.5 text-[9px] text-zinc-400 dark:text-zinc-500 text-center">{label}</div>
+          ))}
+        </div>
+        <div className="w-11 shrink-0" />
+      </div>
+
+      {/* Goal rows */}
       <div className="space-y-1.5">
         {habitGoals.map(goal => (
-          <HabitRow key={goal.id} goal={goal} completionDates={completionDates} today={today} />
+          <HabitRow key={goal.id} goal={goal} completionDates={completionDates} today={today} days={days} />
         ))}
       </div>
     </div>
   );
 }
 
-function HabitRow({ goal, completionDates, today }: { goal: OutcomeData; completionDates: Record<number, { date: string; value: number; completed: boolean }[]>; today: string }) {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const dayCount = useAvailableDays(containerRef);
+function HabitRow({ goal, completionDates, today, days }: { goal: OutcomeData; completionDates: Record<number, { date: string; value: number; completed: boolean }[]>; today: string; days: string[] }) {
   const scheduleDays: number[] = parseScheduleDays(goal.scheduleDays);
   const entries = completionDates[goal.id] || [];
 
-  const days = useMemo(() => {
-    const arr: string[] = [];
-    const now = new Date();
-    for (let i = dayCount - 1; i >= 0; i--) {
-      const d = new Date(now);
-      d.setDate(d.getDate() - i);
-      arr.push(d.toISOString().split('T')[0]);
-    }
-    return arr;
-  }, [dayCount]);
-
-  const { cells, adherence, dayLabels } = useMemo(() => {
+  const { cells, adherence } = useMemo(() => {
     const dateValues = new Map<string, number>();
     const postponedSet = new Set<string>();
     for (const e of entries) {
@@ -95,8 +103,6 @@ function HabitRow({ goal, completionDates, today }: { goal: OutcomeData; complet
         dateValues.set(e.date, (dateValues.get(e.date) || 0) + e.value);
       }
     }
-
-    const labels = days.map(d => ['S','M','T','W','T','F','S'][new Date(d + 'T12:00:00').getDay()]);
 
     const cellData = days.map(dateStr => {
       const d = new Date(dateStr + 'T12:00:00');
@@ -138,7 +144,7 @@ function HabitRow({ goal, completionDates, today }: { goal: OutcomeData; complet
     }
     const adh = exp > 0 ? Math.round((h / exp) * 100) : 0;
 
-    return { cells: cellData, adherence: adh, dayLabels: labels };
+    return { cells: cellData, adherence: adh };
   }, [entries, today, days, goal.startDate, goal.dailyTarget, goal.completionType, scheduleDays]);
 
   const getCellClass = (status: string) => {
@@ -153,34 +159,21 @@ function HabitRow({ goal, completionDates, today }: { goal: OutcomeData; complet
   };
 
   return (
-    <div ref={containerRef}>
-      {/* Day labels */}
-      <div className="flex items-center mb-0.5">
-        <div className="flex-1 min-w-0" />
-        <div className="flex gap-0.5 shrink-0">
-          {dayLabels.map((label, i) => (
-            <div key={i} className="w-3.5 text-[9px] text-zinc-400 dark:text-zinc-500 text-center">{label}</div>
-          ))}
-        </div>
-        <div className="w-11 shrink-0" />
+    <Link href={`/goals/${goal.id}`} className="flex items-center hover:opacity-80 transition-opacity cursor-pointer">
+      <div className="flex-1 min-w-0 flex items-center gap-1.5">
+        {goal.pillarEmoji && <span className="text-xs shrink-0">{goal.pillarEmoji}</span>}
+        <span className="text-xs font-medium text-zinc-700 dark:text-zinc-300 truncate">{goal.name}</span>
       </div>
-      {/* Habit row */}
-      <Link href={`/goals/${goal.id}`} className="flex items-center hover:opacity-80 transition-opacity cursor-pointer">
-        <div className="flex-1 min-w-0 flex items-center gap-1.5">
-          {goal.pillarEmoji && <span className="text-xs shrink-0">{goal.pillarEmoji}</span>}
-          <span className="text-xs font-medium text-zinc-700 dark:text-zinc-300 truncate">{goal.name}</span>
-        </div>
-        <div className="flex gap-0.5 shrink-0 ml-2">
-          {cells.map((status, i) => (
-            <div key={i} className={`w-3.5 h-3.5 rounded-sm shrink-0 ${getCellClass(status)}`} />
-          ))}
-        </div>
-        <div className="w-11 shrink-0 text-right pl-1">
-          <span className={`text-[11px] font-semibold ${
-            adherence >= 80 ? 'text-green-500' : adherence >= 50 ? 'text-amber-500' : 'text-red-500'
-          }`}>{adherence}%</span>
-        </div>
-      </Link>
-    </div>
+      <div className="flex gap-0.5 shrink-0 ml-2">
+        {cells.map((status, i) => (
+          <div key={i} className={`w-3.5 h-3.5 rounded-sm shrink-0 ${getCellClass(status)}`} />
+        ))}
+      </div>
+      <div className="w-11 shrink-0 text-right pl-1">
+        <span className={`text-[11px] font-semibold ${
+          adherence >= 80 ? 'text-green-500' : adherence >= 50 ? 'text-amber-500' : 'text-red-500'
+        }`}>{adherence}%</span>
+      </div>
+    </Link>
   );
 }
