@@ -6,7 +6,6 @@ import { FaPlus, FaCheck, FaMinus, FaPlay, FaPause, FaStar, FaTimes } from "reac
 import { formatScheduleLabel } from "@/lib/constants";
 import { getProgressColor } from "@/lib/scoring";
 import { countScheduledDaysInRange } from "@/lib/effort-calculations";
-import { getGoalBadge } from "@/lib/goal-badge";
 import { useTheme } from "@/components/ThemeProvider";
 import { getTodayString, getYesterdayString, parseScheduleDays, parseCustomDays } from "@/lib/format";
 import type { Task, Outcome, Cycle } from "@/lib/types";
@@ -119,22 +118,23 @@ const TaskItem = memo(function TaskItem({
   })();
 
   // For outcome/target goal tasks, determine if the goal is on track vs expected
+  // Compare absolute values directly (matches "exp:" label display)
   const outcomeOnTrack = (() => {
     if (!task.goalId) return null;
     const goal = goalsList.find(g => g.id === task.goalId);
     if (!goal || (goal.goalType !== 'outcome' && goal.goalType !== 'target')) return null;
-    const badge = getGoalBadge({
-      id: goal.id,
-      goalType: goal.goalType,
-      startValue: goal.startValue ?? 0,
-      targetValue: goal.targetValue ?? 0,
-      currentValue: goal.currentValue ?? 0,
-      startDate: goal.startDate ?? null,
-      targetDate: goal.targetDate ?? null,
-      scheduleDays: goal.scheduleDays ?? null,
-    }, getTodayString());
-    if (!badge) return null;
-    return badge.value >= 0.95;
+    if (!goal.startDate || !goal.targetDate) return null;
+    const taskDate = task.startDate || getTodayString();
+    if (taskDate < goal.startDate || taskDate > goal.targetDate) return null;
+    const sched: number[] = parseScheduleDays(goal.scheduleDays);
+    const effectiveSched = sched.length > 0 ? sched : [0, 1, 2, 3, 4, 5, 6];
+    const total = countScheduledDaysInRange(goal.startDate, goal.targetDate, effectiveSched) || 1;
+    const elapsed = countScheduledDaysInRange(goal.startDate, taskDate, effectiveSched);
+    const range = (goal.targetValue ?? 0) - (goal.startValue ?? 0);
+    if (range === 0) return null;
+    const expected = (goal.startValue ?? 0) + range * (elapsed / total);
+    const isDecrease = (goal.targetValue ?? 0) < (goal.startValue ?? 0);
+    return isDecrease ? (goal.currentValue ?? 0) <= expected : (goal.currentValue ?? 0) >= expected;
   })();
 
   const progressColor = isOverLimit ? '#ef4444'
