@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getAuthenticatedUserId, errorResponse } from "@/lib/api-utils";
+import { getAuthenticatedUserId, errorResponse, parseId } from "@/lib/api-utils";
 import { db, goals, activityLog, tasks, taskSchedules } from "@/lib/db";
 import { saveDailyScore } from "@/lib/save-daily-score";
 import { eq, and, desc } from "drizzle-orm";
@@ -9,7 +9,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     const userId = await getAuthenticatedUserId();
 
     const { id } = await params;
-    const outcomeId = parseInt(id);
+    const outcomeId = parseId(id);
 
     // Verify ownership
     const [outcome] = await db
@@ -52,7 +52,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     const userId = await getAuthenticatedUserId();
 
     const { id } = await params;
-    const outcomeId = parseInt(id);
+    const outcomeId = parseId(id);
     const body = await request.json();
 
     if (body.value == null) {
@@ -174,7 +174,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
     const userId = await getAuthenticatedUserId();
 
     const { id } = await params;
-    const outcomeId = parseInt(id);
+    const outcomeId = parseId(id);
     const body = await request.json();
 
     if (!body.logId || body.value == null) {

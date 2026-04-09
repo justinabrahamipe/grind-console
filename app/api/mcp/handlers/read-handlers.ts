@@ -113,8 +113,8 @@ export async function handleGetFeedback(args: any, userId: string): Promise<stri
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function handleGetTaskDetails(args: any, userId: string): Promise<string> {
-  const taskId = parseInt(args.taskId);
-  if (!taskId) return "Error: taskId is required.";
+  const taskId = parseInt(args.taskId, 10);
+  if (isNaN(taskId) || taskId <= 0) return "Error: taskId is required.";
 
   const [task] = await db.select().from(tasks).where(and(eq(tasks.id, taskId), eq(tasks.userId, userId)));
   if (!task) return "Error: Task not found.";

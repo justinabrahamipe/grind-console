@@ -26,8 +26,8 @@ function parseCustomDaysInput(input: string | null | undefined): string | null {
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function handleCompleteTask(args: any, userId: string): Promise<string> {
-  const taskId = parseInt(args.taskId);
-  if (!taskId) return "Error: taskId is required.";
+  const taskId = parseInt(args.taskId, 10);
+  if (isNaN(taskId) || taskId <= 0) return "Error: taskId is required.";
 
   const task = await getOwnedTask(taskId, userId);
   if (!task) return "Error: Task not found.";
@@ -61,9 +61,9 @@ export async function handleCreateTask(args: any, userId: string): Promise<strin
   const frequency = args.frequency || 'adhoc';
   const isRecurring = frequency !== 'adhoc';
   const completionType = args.completionType || 'checkbox';
-  const basePoints = args.basePoints ? parseInt(args.basePoints) : 10;
+  const basePoints = args.basePoints ? (parseInt(args.basePoints, 10) || 10) : 10;
   const target = args.target ? parseFloat(args.target) : null;
-  const pillarId = args.pillarId ? parseInt(args.pillarId) : null;
+  const pillarId = args.pillarId ? (parseInt(args.pillarId, 10) || null) : null;
 
   if (pillarId) {
     const p = await getOwnedPillar(pillarId, userId);
@@ -71,11 +71,11 @@ export async function handleCreateTask(args: any, userId: string): Promise<strin
   }
 
   // If linked to a goal, inherit dates and pillar from the goal
-  const goalId = args.goalId ? parseInt(args.goalId) : null;
+  const goalId = args.goalId ? (parseInt(args.goalId, 10) || null) : null;
   let goalStartDate: string | null = null;
   let goalEndDate: string | null = null;
   let goalPillarId = pillarId;
-  let goalPeriodId = args.periodId ? parseInt(args.periodId) : null;
+  let goalPeriodId = args.periodId ? (parseInt(args.periodId, 10) || null) : null;
   if (goalId) {
     const goal = await getOwnedGoal(goalId, userId);
     if (!goal) return "Error: Goal not found.";
@@ -98,7 +98,7 @@ export async function handleCreateTask(args: any, userId: string): Promise<strin
       limitValue: args.limitValue ?? null,
       frequency,
       customDays: parseCustomDaysInput(args.customDays),
-      repeatInterval: args.repeatInterval ? parseInt(args.repeatInterval) : null,
+      repeatInterval: args.repeatInterval ? (parseInt(args.repeatInterval, 10) || null) : null,
       basePoints,
       goalId,
       periodId: goalPeriodId,
@@ -135,8 +135,8 @@ export async function handleCreateTask(args: any, userId: string): Promise<strin
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function handleEditTask(args: any, userId: string): Promise<string> {
-  const taskId = parseInt(args.taskId);
-  if (!taskId) return "Error: taskId is required.";
+  const taskId = parseInt(args.taskId, 10);
+  if (isNaN(taskId) || taskId <= 0) return "Error: taskId is required.";
 
   const task = await getOwnedTask(taskId, userId);
   if (!task) return "Error: Task not found.";
@@ -171,8 +171,8 @@ export async function handleEditTask(args: any, userId: string): Promise<string>
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function handleDeleteTask(args: any, userId: string): Promise<string> {
-  const taskId = parseInt(args.taskId);
-  if (!taskId) return "Error: taskId is required.";
+  const taskId = parseInt(args.taskId, 10);
+  if (isNaN(taskId) || taskId <= 0) return "Error: taskId is required.";
 
   const task = await getOwnedTask(taskId, userId);
   if (!task) return "Error: Task not found.";

@@ -1,19 +1,49 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db, locationLogs, userPreferences, tasks, goals, pillars, dailyScores } from "@/lib/db";
 import { eq, and, desc, like, gte, lte } from "drizzle-orm";
+import crypto from "crypto";
+import { rateLimit } from "@/lib/rate-limit";
+
+function hashKey(key: string): string {
+  return crypto.createHash("sha256").update(key).digest("hex");
+}
 
 async function authenticateApiKey(request: NextRequest): Promise<string | null> {
   const key = request.nextUrl.searchParams.get("key") || request.headers.get("x-api-key");
   if (!key) return null;
-  const [pref] = await db
+
+  // Try hashed lookup first, then fall back to plaintext for unmigrated keys
+  const hashed = hashKey(key);
+  const [byHash] = await db
+    .select({ userId: userPreferences.userId })
+    .from(userPreferences)
+    .where(eq(userPreferences.apiKeyHash, hashed));
+  if (byHash?.userId) return byHash.userId;
+
+  const [byPlain] = await db
     .select({ userId: userPreferences.userId })
     .from(userPreferences)
     .where(eq(userPreferences.apiKey, key));
-  return pref?.userId || null;
+  if (byPlain?.userId) {
+    // Migrate: store hash and clear plaintext
+    await db.update(userPreferences)
+      .set({ apiKeyHash: hashed, apiKey: null })
+      .where(eq(userPreferences.userId, byPlain.userId));
+    return byPlain.userId;
+  }
+
+  return null;
 }
 
 export async function GET(request: NextRequest) {
   try {
+    // Rate limit by IP
+    const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
+    const rl = rateLimit(`public:${ip}`, 60, 60_000);
+    if (!rl.allowed) {
+      return NextResponse.json({ error: "Rate limit exceeded. Try again later." }, { status: 429, headers: { "Retry-After": String(Math.ceil((rl.resetAt - Date.now()) / 1000)) } });
+    }
+
     const userId = await authenticateApiKey(request);
     if (!userId) {
       return NextResponse.json({ error: "API key required. Pass as ?key= or x-api-key header." }, { status: 401 });
@@ -33,7 +63,10 @@ export async function GET(request: NextRequest) {
       const conditions = [eq(locationLogs.userId, userId)];
       if (from) conditions.push(gte(locationLogs.date, from));
       if (to) conditions.push(lte(locationLogs.date, to));
-      if (search) conditions.push(like(locationLogs.notes, `%${search}%`));
+      if (search) {
+        const sanitized = search.substring(0, 200).replace(/[%_]/g, '\\$&');
+        conditions.push(like(locationLogs.notes, `%${sanitized}%`));
+      }
       data.logs = await db.select().from(locationLogs).where(and(...conditions)).orderBy(desc(locationLogs.date), desc(locationLogs.createdAt));
     }
 

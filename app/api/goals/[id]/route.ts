@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getAuthenticatedUserId, errorResponse } from "@/lib/api-utils";
+import { getAuthenticatedUserId, errorResponse, parseId } from "@/lib/api-utils";
 import { db, goals, tasks, taskSchedules } from "@/lib/db";
 import { eq, and } from "drizzle-orm";
 import { createAutoLog, logGoalStatusChange } from "@/lib/auto-log";
@@ -13,7 +13,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
     const userId = await getAuthenticatedUserId();
 
     const { id } = await params;
-    const outcomeId = parseInt(id);
+    const outcomeId = parseId(id);
     const body = await request.json();
 
     const existing = await getOwnedGoal(outcomeId, userId);
@@ -83,7 +83,7 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
     const userId = await getAuthenticatedUserId();
 
     const { id } = await params;
-    const outcomeId = parseInt(id);
+    const outcomeId = parseId(id);
 
     // Delete all tasks and schedules linked to this goal
     await db

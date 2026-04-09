@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getAuthenticatedUserId, errorResponse } from "@/lib/api-utils";
+import { getAuthenticatedUserId, errorResponse, escapeCSV } from "@/lib/api-utils";
 import { db, pillars, tasks, taskSchedules } from "@/lib/db";
 import { eq } from "drizzle-orm";
 
@@ -20,7 +20,7 @@ export async function GET(
         const data = await db.select().from(pillars).where(eq(pillars.userId, userId));
         csvData = "Name,Emoji,Color,DefaultBasePoints,Description\n";
         data.forEach((p) => {
-          csvData += `"${p.name}","${p.emoji}","${p.color}",${p.defaultBasePoints},"${p.description || ""}"\n`;
+          csvData += `${escapeCSV(p.name)},${escapeCSV(p.emoji)},${escapeCSV(p.color)},${p.defaultBasePoints},${escapeCSV(p.description)}\n`;
         });
         break;
       }
@@ -30,7 +30,7 @@ export async function GET(
         const data = await db.select().from(taskSchedules).where(eq(taskSchedules.userId, userId));
         csvData = "Name,Pillar ID,Completion Type,Target,Unit,Frequency,Base Points\n";
         data.forEach((t) => {
-          csvData += `"${t.name}",${t.pillarId},"${t.completionType}",${t.target || ""},"${t.unit || ""}","${t.frequency}",${t.basePoints}\n`;
+          csvData += `${escapeCSV(t.name)},${t.pillarId},${escapeCSV(t.completionType)},${t.target || ""},${escapeCSV(t.unit)},${escapeCSV(t.frequency)},${t.basePoints}\n`;
         });
         break;
       }
@@ -40,7 +40,7 @@ export async function GET(
         const data = await db.select().from(tasks).where(eq(tasks.userId, userId));
         csvData = "Task ID,Schedule ID,Date,Completed,Value,Points Earned\n";
         data.forEach((t) => {
-          csvData += `${t.id},${t.scheduleId || ""},"${t.date}",${t.completed},${t.value || ""},${t.pointsEarned}\n`;
+          csvData += `${t.id},${t.scheduleId || ""},${escapeCSV(t.date)},${t.completed},${t.value || ""},${t.pointsEarned}\n`;
         });
         break;
       }

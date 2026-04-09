@@ -12,7 +12,10 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   }
 
   const { id } = await params;
-  const cycleId = parseInt(id);
+  const cycleId = parseInt(id, 10);
+  if (isNaN(cycleId) || cycleId <= 0) {
+    return NextResponse.json({ error: "Invalid ID" }, { status: 400 });
+  }
 
   const [cycle] = await db
     .select()

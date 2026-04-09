@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getAuthenticatedUserId, errorResponse } from "@/lib/api-utils";
+import { getAuthenticatedUserId, errorResponse, parseId } from "@/lib/api-utils";
 import { db, locationLogs } from "@/lib/db";
 import { eq, and } from "drizzle-orm";
 
@@ -7,7 +7,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
   try {
     const userId = await getAuthenticatedUserId();
     const { id } = await params;
-    const logId = parseInt(id);
+    const logId = parseId(id);
     const body = await request.json();
 
     const updateData: Record<string, unknown> = { updatedAt: new Date() };
@@ -37,7 +37,7 @@ export async function DELETE(_request: Request, { params }: { params: Promise<{ 
   try {
     const userId = await getAuthenticatedUserId();
     const { id } = await params;
-    const logId = parseInt(id);
+    const logId = parseId(id);
 
     const deleted = await db
       .delete(locationLogs)

@@ -1,6 +1,8 @@
 import { NextRequest } from "next/server";
 import { db, userPreferences } from "@/lib/db";
 import { eq } from "drizzle-orm";
+import cryptoNode from "crypto";
+import { rateLimit } from "@/lib/rate-limit";
 import { handleGetTasks, handleGetGoals, handleGetScores, handleGetLogs, handleGetPillars, handleGetSummary, handleGetCycles, handleGetFeedback, handleGetTaskDetails } from "./handlers/read-handlers";
 import { handleCompleteTask, handleCreateTask, handleEditTask, handleDeleteTask } from "./handlers/task-handlers";
 import { handleCreateGoal, handleEditGoal } from "./handlers/goal-handlers";
@@ -205,6 +207,10 @@ const TOOLS = [
   },
 ];
 
+function hashKey(key: string): string {
+  return cryptoNode.createHash("sha256").update(key).digest("hex");
+}
+
 async function authenticate(request: NextRequest): Promise<string | null> {
   // Support Bearer token from Authorization header (used by custom connectors)
   const authHeader = request.headers.get("authorization");
@@ -214,11 +220,27 @@ async function authenticate(request: NextRequest): Promise<string | null> {
   const key = bearerKey || request.nextUrl.searchParams.get("key");
   if (!key) return null;
 
-  const [pref] = await db
+  // Try hashed lookup first, then fall back to plaintext for unmigrated keys
+  const hashed = hashKey(key);
+  const [byHash] = await db
+    .select({ userId: userPreferences.userId })
+    .from(userPreferences)
+    .where(eq(userPreferences.apiKeyHash, hashed));
+  if (byHash?.userId) return byHash.userId;
+
+  const [byPlain] = await db
     .select({ userId: userPreferences.userId })
     .from(userPreferences)
     .where(eq(userPreferences.apiKey, key));
-  return pref?.userId || null;
+  if (byPlain?.userId) {
+    // Migrate: store hash and clear plaintext
+    await db.update(userPreferences)
+      .set({ apiKeyHash: hashed, apiKey: null })
+      .where(eq(userPreferences.userId, byPlain.userId));
+    return byPlain.userId;
+  }
+
+  return null;
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -262,6 +284,13 @@ function jsonRpcError(id: number | string | null, code: number, message: string)
 
 export async function POST(request: NextRequest) {
   try {
+    // Rate limit by IP
+    const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
+    const rl = rateLimit(`mcp:${ip}`, 120, 60_000);
+    if (!rl.allowed) {
+      return jsonRpcError(null, -32000, "Rate limit exceeded. Try again later.");
+    }
+
     const userId = await authenticate(request);
     const message = await request.json();
 

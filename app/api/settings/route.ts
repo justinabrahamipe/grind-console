@@ -82,6 +82,9 @@ export async function PUT(request: Request) {
       if (targetColor) updateData.targetColor = targetColor;
       if (outcomeColor) updateData.outcomeColor = outcomeColor;
       if (promoCode !== undefined) {
+        if (typeof promoCode !== 'string' || promoCode.length > 50) {
+          return NextResponse.json({ error: "Invalid promo code" }, { status: 400 });
+        }
         const VALID_CODES = ['FREE123'];
         if (VALID_CODES.includes(promoCode.toUpperCase())) {
           updateData.isPremium = true;

@@ -7,8 +7,8 @@ export async function GET(request: NextRequest) {
   try {
     const userId = await getAuthenticatedUserId();
 
-    const days = parseInt(request.nextUrl.searchParams.get("days") || "30", 10);
-    const clampedDays = Math.min(Math.max(days, 1), 365);
+    const rawDays = parseInt(request.nextUrl.searchParams.get("days") || "30", 10);
+    const clampedDays = Math.min(Math.max(isNaN(rawDays) ? 30 : rawDays, 1), 365);
 
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - clampedDays);

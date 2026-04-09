@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getAuthenticatedUserId, errorResponse } from "@/lib/api-utils";
+import { getAuthenticatedUserId, errorResponse, parseId } from "@/lib/api-utils";
 import { db, pillars } from "@/lib/db";
 import { eq, and } from "drizzle-orm";
 import { createAutoLog } from "@/lib/auto-log";
@@ -11,7 +11,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     const userId = await getAuthenticatedUserId();
 
     const { id } = await params;
-    const pillarId = parseInt(id);
+    const pillarId = parseId(id);
 
     const pillar = await getOwnedPillar(pillarId, userId);
     if (!pillar) {
@@ -29,7 +29,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
     const userId = await getAuthenticatedUserId();
 
     const { id } = await params;
-    const pillarId = parseInt(id);
+    const pillarId = parseId(id);
     const body = await request.json();
 
     const existing = await getOwnedPillar(pillarId, userId);
@@ -56,7 +56,7 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
     const userId = await getAuthenticatedUserId();
 
     const { id } = await params;
-    const pillarId = parseInt(id);
+    const pillarId = parseId(id);
 
     const deleted = await db
       .delete(pillars)
