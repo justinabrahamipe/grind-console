@@ -82,7 +82,7 @@ export default function HabitTracker({ outcomesData, completionDates, today }: H
       </div>
 
       {/* Goal rows */}
-      <div className="space-y-0.5">
+      <div className="flex flex-col gap-px">
         {habitGoals.map(goal => (
           <HabitRow key={goal.id} goal={goal} completionDates={completionDates} today={today} days={days} />
         ))}
@@ -161,7 +161,7 @@ function HabitRow({ goal, completionDates, today, days }: { goal: OutcomeData; c
   };
 
   return (
-    <Link href={`/goals/${goal.id}`} className="flex items-center hover:opacity-80 transition-opacity cursor-pointer">
+    <Link href={`/goals/${goal.id}`} className="flex items-center hover:opacity-80 transition-opacity cursor-pointer leading-none py-px">
       <div className="flex-1 min-w-0 flex items-center gap-1.5">
         {goal.pillarEmoji && <span className="text-xs shrink-0">{goal.pillarEmoji}</span>}
         <span className="text-xs font-medium text-zinc-700 dark:text-zinc-300 truncate">{goal.name}</span>
