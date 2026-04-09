@@ -82,7 +82,7 @@ export default function HabitTracker({ outcomesData, completionDates, today }: H
       </div>
 
       {/* Goal rows */}
-      <div className="space-y-1.5">
+      <div className="space-y-0.5">
         {habitGoals.map(goal => (
           <HabitRow key={goal.id} goal={goal} completionDates={completionDates} today={today} days={days} />
         ))}
