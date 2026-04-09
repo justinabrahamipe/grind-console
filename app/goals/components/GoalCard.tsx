@@ -210,9 +210,9 @@ export default function GoalCard({
             )}
             {!isActivityGoal && !isProject && (
               outcome.targetValue < outcome.startValue ? (
-                <FaArrowDown className="text-xs text-green-500 shrink-0" />
+                <FaArrowDown className={`text-xs shrink-0 ${progress > 0 ? 'text-green-500' : 'text-red-500'}`} />
               ) : (
-                <FaArrowUp className="text-xs text-green-500 shrink-0" />
+                <FaArrowUp className={`text-xs shrink-0 ${progress > 0 ? 'text-green-500' : 'text-red-500'}`} />
               )
             )}
             {isHabitual && adherence !== null && (
@@ -257,8 +257,14 @@ export default function GoalCard({
               </>
             ) : isProject ? (
               <>
-                <span className="whitespace-nowrap">{outcome.currentValue} of {outcome.targetValue} steps</span>
-                {outcome.targetValue > 0 && <span className="font-medium">{Math.round(progress)}%</span>}
+                {outcome.targetValue > 0 ? (
+                  <>
+                    <span className="whitespace-nowrap">{outcome.currentValue} of {outcome.targetValue} steps</span>
+                    <span className="font-medium">{Math.round(progress)}%</span>
+                  </>
+                ) : (
+                  <span className="whitespace-nowrap">No steps yet</span>
+                )}
               </>
             ) : (
               <>

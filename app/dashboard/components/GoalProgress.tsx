@@ -118,7 +118,9 @@ export default function GoalProgress({ outcomesData, completionDates, today }: G
             progress = range === 0 ? 0 : Math.round(Math.min(
               (goal.currentValue - goal.startValue) / range * 100, 100
             ));
-            subtitle = `${goal.currentValue} / ${goal.targetValue} ${goal.unit}`;
+            subtitle = goal.goalType === 'project' && goal.targetValue === 0
+              ? 'No steps yet'
+              : `${goal.currentValue} / ${goal.targetValue} ${goal.unit}`;
           }
           const progressColor = getProgressColor(progress);
 

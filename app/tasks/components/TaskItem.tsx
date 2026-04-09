@@ -372,8 +372,10 @@ const TaskItem = memo(function TaskItem({
                 ? countScheduledDaysInRange(goal.startDate, taskDate, sched)
                 : Math.max(0, Math.round((new Date(taskDate).getTime() - new Date(goal.startDate).getTime()) / 86400000));
               const expected = Math.round((goal.startValue + (goal.targetValue - goal.startValue) * (elapsed / total)) * 10) / 10;
+              const isDecrease = goal.targetValue < goal.startValue;
+              const onTrack = isDecrease ? goal.currentValue <= expected : goal.currentValue >= expected;
               return (
-                <span className="text-[10px] text-purple-500 dark:text-purple-400 shrink-0">
+                <span className={`text-[10px] shrink-0 ${onTrack ? 'text-green-500 dark:text-green-400' : 'text-red-500 dark:text-red-400'}`}>
                   exp: {expected} {goal.unit}
                 </span>
               );

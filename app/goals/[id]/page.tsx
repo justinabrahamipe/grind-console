@@ -487,9 +487,9 @@ export default function GoalDetailPage() {
           )}
           {!isActivityGoal && !isProject && (
             outcome.targetValue < outcome.startValue ? (
-              <FaArrowDown className="text-green-500 shrink-0" />
+              <FaArrowDown className={`shrink-0 ${progress > 0 ? 'text-green-500' : 'text-red-500'}`} />
             ) : (
-              <FaArrowUp className="text-green-500 shrink-0" />
+              <FaArrowUp className={`shrink-0 ${progress > 0 ? 'text-green-500' : 'text-red-500'}`} />
             )
           )}
           {outcome.pillarName && (
@@ -569,10 +569,16 @@ export default function GoalDetailPage() {
             </>
           ) : isProject ? (
             <>
-              <span className="text-lg font-semibold text-zinc-900 dark:text-white">
-                {outcome.currentValue} of {outcome.targetValue} steps
-              </span>
-              {outcome.targetValue > 0 && <span className="font-medium">{Math.round(progress)}%</span>}
+              {outcome.targetValue > 0 ? (
+                <>
+                  <span className="text-lg font-semibold text-zinc-900 dark:text-white">
+                    {outcome.currentValue} of {outcome.targetValue} steps
+                  </span>
+                  <span className="font-medium">{Math.round(progress)}%</span>
+                </>
+              ) : (
+                <span className="text-lg font-semibold text-zinc-900 dark:text-white">No steps yet</span>
+              )}
             </>
           ) : (
             <>
@@ -699,28 +705,30 @@ export default function GoalDetailPage() {
               </div>
             </div>
             {isProject && outcome.status === 'active' && (
-              <div className="flex flex-wrap gap-2 mb-3 p-2 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800/50">
+              <div className="flex flex-col gap-2 mb-3 p-2 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800/50">
                 <input
                   type="text"
                   value={newTaskName}
                   onChange={(e) => setNewTaskName(e.target.value)}
                   onKeyDown={(e) => { if (e.key === 'Enter' && !addingTask) handleAddSubtask(); }}
                   placeholder="Add a step…"
-                  className="flex-1 min-w-[160px] px-3 py-2 text-sm border border-zinc-300 dark:border-zinc-600 rounded-lg bg-white dark:bg-zinc-700 text-zinc-900 dark:text-white"
+                  className="w-full px-3 py-2 text-sm border border-zinc-300 dark:border-zinc-600 rounded-lg bg-white dark:bg-zinc-700 text-zinc-900 dark:text-white"
                 />
-                <input
-                  type="date"
-                  value={newTaskDate}
-                  onChange={(e) => setNewTaskDate(e.target.value)}
-                  className="px-3 py-2 text-sm border border-zinc-300 dark:border-zinc-600 rounded-lg bg-white dark:bg-zinc-700 text-zinc-900 dark:text-white"
-                />
-                <button
-                  onClick={handleAddSubtask}
-                  disabled={addingTask || !newTaskName.trim()}
-                  className="px-4 py-2 text-sm font-medium rounded-lg bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 hover:bg-zinc-800 dark:hover:bg-zinc-200 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {addingTask ? "Adding…" : "Add"}
-                </button>
+                <div className="flex gap-2">
+                  <input
+                    type="date"
+                    value={newTaskDate}
+                    onChange={(e) => setNewTaskDate(e.target.value)}
+                    className="flex-1 px-3 py-2 text-sm border border-zinc-300 dark:border-zinc-600 rounded-lg bg-white dark:bg-zinc-700 text-zinc-900 dark:text-white"
+                  />
+                  <button
+                    onClick={handleAddSubtask}
+                    disabled={addingTask || !newTaskName.trim()}
+                    className="px-4 py-2 text-sm font-medium rounded-lg bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 hover:bg-zinc-800 dark:hover:bg-zinc-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {addingTask ? "Adding…" : "Add"}
+                  </button>
+                </div>
               </div>
             )}
             <div className="space-y-2">
