@@ -56,11 +56,11 @@ export default function GoalProgress({ outcomesData, completionDates, today }: G
     return Math.min(hits, expected);
   };
 
-  // Hide goals that haven't started yet
+  // Hide habitual goals (shown in HabitTracker) and goals that haven't started
   const visibleGoals = outcomesData.filter((o) => {
+    if (o.goalType === 'habitual') return false;
     const start = o.startDate || today;
     if (start > today) return false;
-    if (o.goalType === 'habitual' && getExpectedDays(o) === 0) return false;
     return true;
   });
 
