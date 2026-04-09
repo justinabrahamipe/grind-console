@@ -68,8 +68,9 @@ export default function GoalProgress({ outcomesData, completionDates, today }: G
             : `${goal.currentValue} / ${goal.targetValue} ${goal.unit}`;
           const progressColor = getProgressColor(progress);
 
-          // Compute trajectory: compare current vs expected based on time elapsed
+          // Compute trajectory + momentum ratio
           let trajectory: { label: string; color: string } | null = null;
+          let momentum: { value: number; color: string } | null = null;
           if (goal.startDate && goal.targetDate && range !== 0) {
             const totalMs = new Date(goal.targetDate).getTime() - new Date(goal.startDate).getTime();
             const elapsedMs = new Date(today > goal.targetDate ? goal.targetDate : today).getTime() - new Date(goal.startDate).getTime();
@@ -79,6 +80,13 @@ export default function GoalProgress({ outcomesData, completionDates, today }: G
               const isDecrease = goal.targetValue < goal.startValue;
               const onTrack = isDecrease ? goal.currentValue <= expectedValue : goal.currentValue >= expectedValue;
               const deviation = Math.abs(goal.currentValue - expectedValue) / Math.abs(range);
+
+              // Momentum: actual progress / expected progress
+              const expectedPct = Math.max(timeProgress * 100, 0.1);
+              const mRatio = Math.round((progress / expectedPct) * 10) / 10;
+              const mColor = mRatio >= 1.0 ? '#22C55E' : '#EF4444';
+              momentum = { value: mRatio, color: mColor };
+
               if (progress >= 100) {
                 trajectory = { label: 'Done', color: '#22C55E' };
               } else if (onTrack) {
@@ -102,11 +110,11 @@ export default function GoalProgress({ outcomesData, completionDates, today }: G
                 }}
               />
               <div className="relative">
-                <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center justify-between gap-1.5">
                   <div className="text-sm font-semibold text-zinc-900 dark:text-white truncate">{goal.name}</div>
-                  {trajectory && (
-                    <span className="text-[10px] font-medium shrink-0 px-1.5 py-0.5 rounded-full" style={{ backgroundColor: trajectory.color + '18', color: trajectory.color }}>
-                      {trajectory.label}
+                  {trajectory && momentum && (
+                    <span className="text-[10px] font-medium shrink-0 px-1.5 py-0.5 rounded-full whitespace-nowrap" style={{ backgroundColor: trajectory.color + '18', color: trajectory.color }}>
+                      {momentum.value.toFixed(1)}x · {trajectory.label}
                     </span>
                   )}
                 </div>
