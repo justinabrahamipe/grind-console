@@ -13,6 +13,12 @@ interface GoalProgressProps {
   today: string;
 }
 
+function fmtNum(n: number): string {
+  if (Math.abs(n) >= 1000000) return (n / 1000000).toFixed(1).replace(/\.0$/, '') + 'M';
+  if (Math.abs(n) >= 1000) return (n / 1000).toFixed(1).replace(/\.0$/, '') + 'k';
+  return String(n % 1 === 0 ? n : n.toFixed(1));
+}
+
 export default function GoalProgress({ outcomesData, completionDates, today }: GoalProgressProps) {
   if (outcomesData.length === 0) return null;
 
@@ -58,18 +64,16 @@ export default function GoalProgress({ outcomesData, completionDates, today }: G
       </div>
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
         {visibleGoals.map((goal) => {
-          const isHabitual = goal.goalType === 'habitual';
           const range = goal.targetValue - goal.startValue;
 
           const progress = range === 0 ? 0 : Math.round(Math.min(
             (goal.currentValue - goal.startValue) / range * 100, 100
           ));
+          const progressColor = getProgressColor(progress);
+          const badge = getGoalBadge(goal, today);
           const subtitle = goal.goalType === 'project' && goal.targetValue === 0
             ? 'No steps yet'
-            : `${goal.currentValue} / ${goal.targetValue} ${goal.unit}`;
-          const progressColor = getProgressColor(progress);
-
-          const badge = getGoalBadge(goal, today);
+            : `${fmtNum(goal.currentValue)} / ${fmtNum(goal.targetValue)} ${goal.unit}`;
 
           return (
             <Link
@@ -85,17 +89,19 @@ export default function GoalProgress({ outcomesData, completionDates, today }: G
                 }}
               />
               <div className="relative">
-                <div className="flex items-center justify-between gap-1.5">
-                  <div className="text-sm font-semibold text-zinc-900 dark:text-white truncate">{goal.name}</div>
+                <div className="text-sm font-semibold text-zinc-900 dark:text-white truncate">{goal.name}</div>
+                <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
+                  <span className="text-[11px] font-bold px-1.5 py-0.5 rounded-md" style={{ backgroundColor: progressColor + '18', color: progressColor }}>
+                    {progress}%
+                  </span>
+                  <span className="text-[11px] px-1.5 py-0.5 rounded-md bg-zinc-100 dark:bg-zinc-700 text-zinc-600 dark:text-zinc-400">
+                    {subtitle}
+                  </span>
                   {badge && (
-                    <span className="text-[10px] font-medium shrink-0 px-1.5 py-0.5 rounded-full whitespace-nowrap" style={{ backgroundColor: badge.color + '18', color: badge.color }}>
-                      {badge.value.toFixed(1)}x · {badge.label}
+                    <span className="text-[11px] font-medium px-1.5 py-0.5 rounded-md" style={{ backgroundColor: badge.color + '18', color: badge.color }}>
+                      {badge.value.toFixed(1)}x
                     </span>
                   )}
-                </div>
-                <div className="flex items-center justify-between mt-1">
-                  <span className="text-lg font-bold" style={{ color: progressColor }}>{progress}%</span>
-                  <span className="text-xs text-zinc-500 dark:text-zinc-400">{subtitle}</span>
                 </div>
               </div>
             </Link>
