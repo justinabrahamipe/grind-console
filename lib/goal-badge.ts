@@ -53,21 +53,17 @@ export function getGoalBadge(goal: {
     return { value: val, label, color };
   }
 
-  // Outcome goals: schedule-aware trajectory using yesterday as elapsed end
+  // Outcome goals: schedule-aware trajectory using today as elapsed end (matches task "exp:" display)
   const effectiveToday = today > goal.targetDate ? goal.targetDate : today;
-  const yd = new Date(effectiveToday + 'T12:00:00');
-  yd.setDate(yd.getDate() - 1);
-  const ydStr = yd.toISOString().split('T')[0];
-  const elapsedEnd = ydStr >= goal.startDate ? ydStr : goal.startDate;
 
   let totalDays: number;
   let elapsedDays: number;
   if (sched.length > 0) {
     totalDays = countScheduledDaysInRange(goal.startDate, goal.targetDate, sched);
-    elapsedDays = countScheduledDaysInRange(goal.startDate, elapsedEnd, sched);
+    elapsedDays = countScheduledDaysInRange(goal.startDate, effectiveToday, sched);
   } else {
     totalDays = Math.max(1, Math.round((new Date(goal.targetDate).getTime() - new Date(goal.startDate).getTime()) / 86400000) + 1);
-    elapsedDays = Math.max(0, Math.round((new Date(elapsedEnd).getTime() - new Date(goal.startDate).getTime()) / 86400000) + 1);
+    elapsedDays = Math.max(1, Math.round((new Date(effectiveToday).getTime() - new Date(goal.startDate).getTime()) / 86400000) + 1);
   }
 
   if (totalDays <= 0 || elapsedDays <= 0) return { value: 1.0, label: 'On track', color: '#22C55E' };
