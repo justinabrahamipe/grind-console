@@ -44,13 +44,14 @@ export default function HabitTracker({ outcomesData, completionDates, today }: H
       </div>
 
       {/* Day labels */}
-      <div className="flex items-center gap-0 mb-1">
+      <div className="flex items-center gap-0 mb-1 max-w-2xl">
         <div className="w-28 shrink-0" />
         <div className="flex-1 grid gap-0.5" style={{ gridTemplateColumns: `repeat(${days.length}, 1fr)` }}>
           {dayLabels.map((label, i) => (
             <div key={i} className="text-[9px] text-zinc-400 dark:text-zinc-500 text-center">{label}</div>
           ))}
         </div>
+        <div className="w-10 shrink-0" />
       </div>
 
       {/* Goal rows */}
@@ -72,8 +73,29 @@ export default function HabitTracker({ outcomesData, completionDates, today }: H
           }
           const doneDates = new Set(dateValues.keys());
 
+          // Calculate adherence %
+          const start = goal.startDate && goal.startDate <= today ? goal.startDate : today;
+          let expected = 0;
+          const iter = new Date(start + 'T00:00:00');
+          const endD = new Date(today + 'T00:00:00');
+          while (iter <= endD) {
+            if (scheduleDays.length === 0 || scheduleDays.includes(iter.getDay())) expected++;
+            iter.setDate(iter.getDate() + 1);
+          }
+          let hits = 0;
+          if (!goal.dailyTarget || goal.completionType === 'checkbox') {
+            const uniqueDone = new Set([...dateValues.keys()].filter(d => d >= start && d <= today));
+            hits = Math.min(uniqueDone.size, expected);
+          } else {
+            for (const [d, val] of dateValues) {
+              if (d >= start && d <= today) hits += Math.min(val / goal.dailyTarget, 1);
+            }
+            hits = Math.min(hits, expected);
+          }
+          const adherence = expected > 0 ? Math.round((hits / expected) * 100) : 0;
+
           return (
-            <div key={goal.id} className="flex items-center gap-0">
+            <div key={goal.id} className="flex items-center gap-0 max-w-2xl">
               <div className="w-28 shrink-0 flex items-center gap-1.5 min-w-0">
                 {goal.pillarEmoji && <span className="text-xs">{goal.pillarEmoji}</span>}
                 <span className="text-xs font-medium text-zinc-700 dark:text-zinc-300 truncate">{goal.name}</span>
@@ -111,6 +133,11 @@ export default function HabitTracker({ outcomesData, completionDates, today }: H
                   }
                   return <div key={dateStr} className="aspect-square rounded-sm bg-red-400" />;
                 })}
+              </div>
+              <div className="w-10 shrink-0 text-right">
+                <span className={`text-[11px] font-semibold ${
+                  adherence >= 80 ? 'text-green-500' : adherence >= 50 ? 'text-amber-500' : 'text-red-500'
+                }`}>{adherence}%</span>
               </div>
             </div>
           );
