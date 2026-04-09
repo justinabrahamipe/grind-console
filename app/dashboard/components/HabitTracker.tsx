@@ -2,6 +2,7 @@
 
 import { useMemo, useState, useRef, useEffect } from "react";
 import { FaFire } from "react-icons/fa";
+import Link from "next/link";
 import type { OutcomeData } from "@/lib/types";
 import { parseScheduleDays } from "@/lib/format";
 
@@ -164,7 +165,7 @@ function HabitRow({ goal, completionDates, today }: { goal: OutcomeData; complet
         <div className="w-11 shrink-0" />
       </div>
       {/* Habit row */}
-      <div className="flex items-center">
+      <Link href={`/goals/${goal.id}`} className="flex items-center hover:opacity-80 transition-opacity cursor-pointer">
         <div className="flex-1 min-w-0 flex items-center gap-1.5">
           {goal.pillarEmoji && <span className="text-xs shrink-0">{goal.pillarEmoji}</span>}
           <span className="text-xs font-medium text-zinc-700 dark:text-zinc-300 truncate">{goal.name}</span>
@@ -179,7 +180,7 @@ function HabitRow({ goal, completionDates, today }: { goal: OutcomeData; complet
             adherence >= 80 ? 'text-green-500' : adherence >= 50 ? 'text-amber-500' : 'text-red-500'
           }`}>{adherence}%</span>
         </div>
-      </div>
+      </Link>
     </div>
   );
 }
