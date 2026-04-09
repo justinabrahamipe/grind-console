@@ -101,27 +101,39 @@ export function calculateTrajectory(
   for (const goal of outcomeGoals) {
     const startDate = goal.startDate || today;
     const endDate = goal.targetDate || today;
+    const scheduleDays: number[] = parseScheduleDays(goal.scheduleDays);
 
     if (today < startDate) {
       results.push({ goalId: goal.id, pillarId: goal.pillarId, trajectory: 1.0, label: 'Not started' });
       continue;
     }
 
-    const totalMs = new Date(endDate).getTime() - new Date(startDate).getTime();
-    // Use yesterday for elapsed — today's work is in progress
     const effectiveEnd = today > endDate ? endDate : today;
+    // Use yesterday for elapsed — today's work is in progress
     const yd = new Date(effectiveEnd + 'T12:00:00');
     yd.setDate(yd.getDate() - 1);
     const ydStr = yd.toISOString().split('T')[0];
     const elapsedEnd2 = ydStr >= startDate ? ydStr : startDate;
-    const elapsedMs = new Date(elapsedEnd2).getTime() - new Date(startDate).getTime();
 
-    if (totalMs <= 0 || elapsedMs <= 0) {
-      results.push({ goalId: goal.id, pillarId: goal.pillarId, trajectory: 1.0, label: 'On track' });
-      continue;
+    // Use scheduled days if available, otherwise calendar days
+    let timeProgress: number;
+    if (scheduleDays.length > 0) {
+      const totalDays = countScheduledDaysInRange(startDate, endDate, scheduleDays);
+      const elapsedDays = countScheduledDaysInRange(startDate, elapsedEnd2, scheduleDays);
+      if (totalDays <= 0 || elapsedDays <= 0) {
+        results.push({ goalId: goal.id, pillarId: goal.pillarId, trajectory: 1.0, label: 'On track' });
+        continue;
+      }
+      timeProgress = elapsedDays / totalDays;
+    } else {
+      const totalMs = new Date(endDate).getTime() - new Date(startDate).getTime();
+      const elapsedMs = new Date(elapsedEnd2).getTime() - new Date(startDate).getTime();
+      if (totalMs <= 0 || elapsedMs <= 0) {
+        results.push({ goalId: goal.id, pillarId: goal.pillarId, trajectory: 1.0, label: 'On track' });
+        continue;
+      }
+      timeProgress = elapsedMs / totalMs;
     }
-
-    const timeProgress = elapsedMs / totalMs;
     const range = goal.targetValue - goal.startValue;
     if (range === 0) {
       results.push({ goalId: goal.id, pillarId: goal.pillarId, trajectory: 1.0, label: 'Complete' });
