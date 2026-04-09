@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 import { getAuthenticatedUserId, errorResponse } from "@/lib/api-utils";
-import { db, goals, pillars, tasks } from "@/lib/db";
-import { eq, and, isNotNull, inArray, or, gt } from "drizzle-orm";
-import { calculateMomentum, calculateTrajectory } from "@/lib/momentum";
+import { db, goals, pillars } from "@/lib/db";
+import { eq } from "drizzle-orm";
+import { getGoalBadge } from "@/lib/goal-badge";
 
 export async function GET() {
   try {
@@ -22,37 +22,6 @@ export async function GET() {
         .where(eq(pillars.userId, userId)),
     ]);
 
-    // Get logs from completed tasks linked to goals
-    const goalIds = userGoals.map(g => g.id);
-    let logs: { outcomeId: number; value: number; loggedAt: string }[] = [];
-    if (goalIds.length > 0) {
-      const allGoalTasks = await db
-        .select({
-          goalId: tasks.goalId,
-          value: tasks.value,
-          date: tasks.date,
-          completed: tasks.completed,
-        })
-        .from(tasks)
-        .where(and(
-          eq(tasks.userId, userId),
-          isNotNull(tasks.goalId),
-          inArray(tasks.goalId, goalIds),
-          or(
-            eq(tasks.completed, true),
-            gt(tasks.value, 0),
-          ),
-        ));
-
-      logs = allGoalTasks.map(c => ({
-        outcomeId: c.goalId!,
-        // For checkbox tasks, value is null when completed — treat as 1 so it counts as a hit.
-        // Discarded tasks have value=0 explicitly, which correctly won't count (0 > 0 = false).
-        value: c.value != null ? c.value : 1,
-        loggedAt: c.date + "T12:00:00.000Z",
-      }));
-    }
-
     const mappedGoals = userGoals.map(g => ({
       id: g.id,
       goalType: g.goalType,
@@ -69,53 +38,53 @@ export async function GET() {
       completionType: g.completionType,
     }));
 
-    const summary = calculateMomentum(mappedGoals, logs, today);
-    const trajectorySummary = calculateTrajectory(mappedGoals, today);
+    // Compute badges using shared getGoalBadge for consistency
+    const goalDetails: { goalId: number; goalType: string; pillarId: number | null; momentum: number; label: string; name: string; currentValue: number; targetValue: number; unit: string }[] = [];
+    const trajectoryDetails: { goalId: number; pillarId: number | null; trajectory: number; label: string; name: string; currentValue: number; targetValue: number; unit: string }[] = [];
+    const pillarMomentum: Record<number, number[]> = {};
 
-    // Enrich with pillar info
+    for (const g of mappedGoals) {
+      const badge = getGoalBadge(g, today);
+      const goal = userGoals.find(og => og.id === g.id);
+      if (!badge) continue;
+
+      if (g.goalType === 'target') {
+        goalDetails.push({
+          goalId: g.id, goalType: g.goalType, pillarId: g.pillarId,
+          momentum: badge.value, label: badge.label,
+          name: goal?.name || '', currentValue: g.currentValue, targetValue: g.targetValue, unit: goal?.unit || '',
+        });
+        const pid = g.pillarId ?? 0;
+        if (!pillarMomentum[pid]) pillarMomentum[pid] = [];
+        pillarMomentum[pid].push(badge.value);
+      } else if (g.goalType === 'outcome') {
+        trajectoryDetails.push({
+          goalId: g.id, pillarId: g.pillarId,
+          trajectory: badge.value, label: badge.label,
+          name: goal?.name || '', currentValue: g.currentValue, targetValue: g.targetValue, unit: goal?.unit || '',
+        });
+      }
+    }
+
+    // Pillar aggregation
     const pillarInfo = userPillars.map(p => ({
-      id: p.id,
-      name: p.name,
-      emoji: p.emoji,
-      color: p.color,
-      defaultBasePoints: p.defaultBasePoints,
-      momentum: summary.pillarMomentum[p.id] ?? null,
+      id: p.id, name: p.name, emoji: p.emoji, color: p.color, defaultBasePoints: p.defaultBasePoints,
+      momentum: pillarMomentum[p.id] ? Math.round(pillarMomentum[p.id].reduce((a, b) => a + b, 0) / pillarMomentum[p.id].length * 100) / 100 : null,
     }));
 
-    // Enrich momentum goals with names
-    const goalDetails = summary.goals.map(g => {
-      const goal = userGoals.find(og => og.id === g.goalId);
-      return {
-        ...g,
-        name: goal?.name || '',
-        currentValue: goal?.currentValue || 0,
-        targetValue: goal?.targetValue || 0,
-        unit: goal?.unit || '',
-      };
-    });
-
-    // Enrich trajectory goals with names
-    const trajectoryDetails = trajectorySummary.goals.map(g => {
-      const goal = userGoals.find(og => og.id === g.goalId);
-      return {
-        ...g,
-        name: goal?.name || '',
-        currentValue: goal?.currentValue || 0,
-        targetValue: goal?.targetValue || 0,
-        unit: goal?.unit || '',
-      };
-    });
-
-    // Return null for overall when there are no goals, so the UI hides the stat
-    const hasMomentumGoals = userGoals.some(g => g.goalType === 'habitual' || g.goalType === 'target');
-    const hasOutcomeGoals = userGoals.some(g => g.goalType === 'outcome');
+    const overallMomentum = goalDetails.length > 0
+      ? Math.round(goalDetails.reduce((s, g) => s + g.momentum, 0) / goalDetails.length * 100) / 100
+      : null;
+    const overallTrajectory = trajectoryDetails.length > 0
+      ? Math.round(trajectoryDetails.reduce((s, g) => s + g.trajectory, 0) / trajectoryDetails.length * 100) / 100
+      : null;
 
     return NextResponse.json({
-      overall: hasMomentumGoals ? summary.overall : null,
+      overall: overallMomentum,
       pillars: pillarInfo,
       goals: goalDetails,
       trajectory: {
-        overall: hasOutcomeGoals ? trajectorySummary.overall : null,
+        overall: overallTrajectory,
         goals: trajectoryDetails,
       },
     });

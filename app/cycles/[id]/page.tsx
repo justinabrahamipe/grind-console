@@ -12,9 +12,9 @@ import { useSession } from "next-auth/react";
 import { useRouter, useParams } from "next/navigation";
 import { getCurrentWeekNumber, getGoalStatus, getTotalWeeks } from "@/lib/cycle-scoring";
 import { computeCycleAnalytics } from "@/lib/cycle-analytics";
-import { calculateMomentum, calculateTrajectory } from "@/lib/momentum";
+import { getGoalBadge } from "@/lib/goal-badge";
 import { parseScheduleDays } from "@/lib/format";
-import type { CycleDetail, GoalForMomentum } from "@/lib/types";
+import type { CycleDetail } from "@/lib/types";
 import { useTheme } from "@/components/ThemeProvider";
 
 export default function CycleDetailPage() {
@@ -62,50 +62,34 @@ export default function CycleDetailPage() {
   const goalMetrics = useMemo(() => {
     if (!selectedCycle) return { avgMomentum: null as number | null, avgTrajectory: null as number | null };
 
-    // Trajectory from outcome goals (using schedule-aware calculation)
-    const outcomeGoals = selectedCycle.goals.filter(g => g.goalType === "outcome" && g.startDate && g.targetDate);
-    let avgTrajectory: number | null = null;
-    if (outcomeGoals.length > 0) {
-      const todayStr = new Date().toISOString().split("T")[0];
-      const goalsForTrajectory: GoalForMomentum[] = outcomeGoals.map(g => ({
+    const todayStr = new Date().toISOString().split("T")[0];
+
+    // Compute badges using shared getGoalBadge for consistent calculation
+    const targetValues: number[] = [];
+    const outcomeValues: number[] = [];
+    for (const g of selectedCycle.goals) {
+      const badge = getGoalBadge({
         id: g.id,
         goalType: g.goalType,
+        startValue: g.startValue || 0,
         targetValue: g.targetValue,
         currentValue: g.currentValue,
-        startValue: g.startValue || 0,
         startDate: g.startDate ?? selectedCycle.startDate,
         targetDate: g.targetDate ?? selectedCycle.endDate,
         scheduleDays: g.scheduleDays ?? null,
-        pillarId: g.pillarId ?? null,
-      }));
-      const trajectoryResult = calculateTrajectory(goalsForTrajectory, todayStr);
-      if (trajectoryResult.goals.length > 0) {
-        avgTrajectory = Math.round(trajectoryResult.overall * 10) / 10;
-      }
+        flexibilityRule: g.flexibilityRule ?? undefined,
+      }, todayStr);
+      if (!badge) continue;
+      if (g.goalType === 'target') targetValues.push(badge.value);
+      else if (g.goalType === 'outcome') outcomeValues.push(badge.value);
     }
 
-    // Momentum from target goals
-    const targetGoals = selectedCycle.goals.filter(g => g.goalType === "target");
-    let avgMomentum: number | null = null;
-    if (targetGoals.length > 0) {
-      const todayStr = new Date().toISOString().split("T")[0];
-      const goalsForMomentum: GoalForMomentum[] = targetGoals.map(g => ({
-        id: g.id,
-        goalType: g.goalType,
-        targetValue: g.targetValue,
-        currentValue: g.currentValue,
-        startValue: g.startValue || 0,
-        startDate: g.startDate ?? selectedCycle.startDate,
-        targetDate: g.targetDate ?? selectedCycle.endDate,
-        scheduleDays: g.scheduleDays ?? null,
-        pillarId: g.pillarId ?? null,
-        flexibilityRule: g.flexibilityRule ?? undefined,
-      }));
-      const momentumResult = calculateMomentum(goalsForMomentum, [], todayStr);
-      if (momentumResult.goals.length > 0) {
-        avgMomentum = momentumResult.overall;
-      }
-    }
+    const avgMomentum = targetValues.length > 0
+      ? Math.round(targetValues.reduce((s, v) => s + v, 0) / targetValues.length * 10) / 10
+      : null;
+    const avgTrajectory = outcomeValues.length > 0
+      ? Math.round(outcomeValues.reduce((s, v) => s + v, 0) / outcomeValues.length * 10) / 10
+      : null;
 
     return { avgMomentum, avgTrajectory };
   }, [selectedCycle]);
