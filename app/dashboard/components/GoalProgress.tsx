@@ -1,8 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { parseScheduleDays } from "@/lib/format";
-import { FaTrophy } from "react-icons/fa";
+import { FaBullseye } from "react-icons/fa";
 import Link from "next/link";
 import { getProgressColor } from "@/lib/scoring";
 import type { OutcomeData } from "@/lib/types";
@@ -16,46 +15,6 @@ interface GoalProgressProps {
 export default function GoalProgress({ outcomesData, completionDates, today }: GoalProgressProps) {
   if (outcomesData.length === 0) return null;
 
-  // Pre-compute expected days for habitual goals so we can filter out 0/0
-  const getExpectedDays = (o: OutcomeData) => {
-    const scheduleDays: number[] = parseScheduleDays(o.scheduleDays);
-    const start = o.startDate || today;
-    let expected = 0;
-    const d = new Date(start + 'T00:00:00');
-    const endD = new Date(today + 'T00:00:00');
-    while (d <= endD) {
-      if (scheduleDays.length === 0 || scheduleDays.includes(d.getDay())) expected++;
-      d.setDate(d.getDate() + 1);
-    }
-    return expected;
-  };
-
-  // Compute proportional hits for a habitual goal
-  const getHabitualHits = (o: OutcomeData, expected: number) => {
-    const entries = completionDates[o.id] || [];
-    const start = o.startDate || today;
-
-    // Filter: in range, positive value (exclude postpone markers -1)
-    const filtered = entries.filter(e => e.date >= start && e.date <= today && e.value > 0);
-
-    // For checkbox goals (no dailyTarget), keep binary
-    if (!o.dailyTarget || o.completionType === 'checkbox') {
-      const uniqueDates = new Set(filtered.map(e => e.date));
-      return Math.min(uniqueDates.size, expected);
-    }
-
-    // Proportional: sum up fractional credit per day, capped at 1.0 per day
-    const dayValues = new Map<string, number>();
-    for (const e of filtered) {
-      dayValues.set(e.date, (dayValues.get(e.date) || 0) + e.value);
-    }
-    let hits = 0;
-    for (const val of dayValues.values()) {
-      hits += Math.min(val / o.dailyTarget, 1);
-    }
-    return Math.min(hits, expected);
-  };
-
   // Hide habitual goals (shown in HabitTracker) and goals that haven't started
   const visibleGoals = outcomesData.filter((o) => {
     if (o.goalType === 'habitual') return false;
@@ -67,11 +26,6 @@ export default function GoalProgress({ outcomesData, completionDates, today }: G
   if (visibleGoals.length === 0) return null;
 
   const totalProgress = visibleGoals.reduce((sum, o) => {
-    if (o.goalType === 'habitual') {
-      const expected = getExpectedDays(o);
-      const hits = getHabitualHits(o, expected);
-      return sum + (expected > 0 ? Math.min((hits / expected) * 100, 100) : 0);
-    }
     const range = o.targetValue - o.startValue;
     if (range === 0) return sum;
     const p = (o.currentValue - o.startValue) / range * 100;
@@ -83,8 +37,8 @@ export default function GoalProgress({ outcomesData, completionDates, today }: G
     <div className="bg-white dark:bg-zinc-800 rounded-2xl shadow-sm border border-zinc-200 dark:border-zinc-700 p-4 mb-6">
       <div className="flex items-center justify-between mb-1">
         <div className="flex items-center gap-2">
-          <FaTrophy className="text-lg text-emerald-500" />
-          <h2 className="text-lg font-semibold text-zinc-900 dark:text-white">Goals</h2>
+          <FaBullseye className="text-lg text-emerald-500" />
+          <h2 className="text-lg font-semibold text-zinc-900 dark:text-white">Targets & Outcomes</h2>
         </div>
         <div className="flex items-center gap-3">
           <span className="text-lg font-bold text-emerald-500">{overallPct}%</span>
@@ -106,23 +60,34 @@ export default function GoalProgress({ outcomesData, completionDates, today }: G
           const isHabitual = goal.goalType === 'habitual';
           const range = goal.targetValue - goal.startValue;
 
-          let progress: number;
-          let subtitle: string;
-          if (isHabitual) {
-            const expected = getExpectedDays(goal);
-            const hits = getHabitualHits(goal, expected);
-            progress = expected > 0 ? Math.round((hits / expected) * 100) : 0;
-            const hitsDisplay = Number.isInteger(hits) ? hits : hits.toFixed(1);
-            subtitle = `${hitsDisplay} / ${expected} days`;
-          } else {
-            progress = range === 0 ? 0 : Math.round(Math.min(
-              (goal.currentValue - goal.startValue) / range * 100, 100
-            ));
-            subtitle = goal.goalType === 'project' && goal.targetValue === 0
-              ? 'No steps yet'
-              : `${goal.currentValue} / ${goal.targetValue} ${goal.unit}`;
-          }
+          const progress = range === 0 ? 0 : Math.round(Math.min(
+            (goal.currentValue - goal.startValue) / range * 100, 100
+          ));
+          const subtitle = goal.goalType === 'project' && goal.targetValue === 0
+            ? 'No steps yet'
+            : `${goal.currentValue} / ${goal.targetValue} ${goal.unit}`;
           const progressColor = getProgressColor(progress);
+
+          // Compute trajectory: compare current vs expected based on time elapsed
+          let trajectory: { label: string; color: string } | null = null;
+          if (goal.startDate && goal.targetDate && range !== 0) {
+            const totalMs = new Date(goal.targetDate).getTime() - new Date(goal.startDate).getTime();
+            const elapsedMs = new Date(today > goal.targetDate ? goal.targetDate : today).getTime() - new Date(goal.startDate).getTime();
+            if (totalMs > 0 && elapsedMs >= 0) {
+              const timeProgress = elapsedMs / totalMs;
+              const expectedValue = goal.startValue + range * timeProgress;
+              const isDecrease = goal.targetValue < goal.startValue;
+              const onTrack = isDecrease ? goal.currentValue <= expectedValue : goal.currentValue >= expectedValue;
+              const deviation = Math.abs(goal.currentValue - expectedValue) / Math.abs(range);
+              if (progress >= 100) {
+                trajectory = { label: 'Done', color: '#22C55E' };
+              } else if (onTrack) {
+                trajectory = { label: deviation > 0.15 ? 'Ahead' : 'On track', color: '#22C55E' };
+              } else {
+                trajectory = { label: deviation > 0.15 ? 'Behind' : 'Slightly behind', color: '#EF4444' };
+              }
+            }
+          }
 
           return (
             <div
@@ -137,7 +102,14 @@ export default function GoalProgress({ outcomesData, completionDates, today }: G
                 }}
               />
               <div className="relative">
-                <div className="text-sm font-semibold text-zinc-900 dark:text-white truncate">{goal.name}</div>
+                <div className="flex items-center justify-between gap-2">
+                  <div className="text-sm font-semibold text-zinc-900 dark:text-white truncate">{goal.name}</div>
+                  {trajectory && (
+                    <span className="text-[10px] font-medium shrink-0 px-1.5 py-0.5 rounded-full" style={{ backgroundColor: trajectory.color + '18', color: trajectory.color }}>
+                      {trajectory.label}
+                    </span>
+                  )}
+                </div>
                 <div className="flex items-center justify-between mt-1">
                   <span className="text-lg font-bold" style={{ color: progressColor }}>{progress}%</span>
                   <span className="text-xs text-zinc-500 dark:text-zinc-400">{subtitle}</span>
