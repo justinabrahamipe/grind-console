@@ -6,6 +6,7 @@ import { FaPlus, FaCheck, FaMinus, FaPlay, FaPause, FaStar, FaTimes } from "reac
 import { formatScheduleLabel } from "@/lib/constants";
 import { getProgressColor } from "@/lib/scoring";
 import { countScheduledDaysInRange } from "@/lib/effort-calculations";
+import { getGoalBadge } from "@/lib/goal-badge";
 import { useTheme } from "@/components/ThemeProvider";
 import { getTodayString, getYesterdayString, parseScheduleDays, parseCustomDays } from "@/lib/format";
 import type { Task, Outcome, Cycle } from "@/lib/types";
@@ -117,23 +118,23 @@ const TaskItem = memo(function TaskItem({
     return Math.min((liveValue / target) * 100, 100);
   })();
 
-  // For outcome goal tasks, determine if the goal is on track vs expected
+  // For outcome/target goal tasks, determine if the goal is on track vs expected
   const outcomeOnTrack = (() => {
     if (!task.goalId) return null;
     const goal = goalsList.find(g => g.id === task.goalId);
-    if (!goal || goal.goalType !== 'outcome' || !goal.startDate || !goal.targetDate) return null;
-    const taskDate = task.startDate || getTodayString();
-    if (taskDate < goal.startDate || taskDate > goal.targetDate) return null;
-    const sched: number[] = parseScheduleDays(goal.scheduleDays);
-    const total = sched.length > 0
-      ? countScheduledDaysInRange(goal.startDate, goal.targetDate, sched)
-      : Math.max(1, Math.round((new Date(goal.targetDate).getTime() - new Date(goal.startDate).getTime()) / 86400000));
-    const elapsed = sched.length > 0
-      ? countScheduledDaysInRange(goal.startDate, taskDate, sched)
-      : Math.max(0, Math.round((new Date(taskDate).getTime() - new Date(goal.startDate).getTime()) / 86400000));
-    const expected = Math.round((goal.startValue + (goal.targetValue - goal.startValue) * (elapsed / total)) * 10) / 10;
-    const isDecrease = goal.targetValue < goal.startValue;
-    return isDecrease ? goal.currentValue <= expected : goal.currentValue >= expected;
+    if (!goal || (goal.goalType !== 'outcome' && goal.goalType !== 'target')) return null;
+    const badge = getGoalBadge({
+      id: goal.id,
+      goalType: goal.goalType,
+      startValue: goal.startValue ?? 0,
+      targetValue: goal.targetValue ?? 0,
+      currentValue: goal.currentValue ?? 0,
+      startDate: goal.startDate ?? null,
+      targetDate: goal.targetDate ?? null,
+      scheduleDays: goal.scheduleDays ?? null,
+    }, getTodayString());
+    if (!badge) return null;
+    return badge.value >= 0.95;
   })();
 
   const progressColor = isOverLimit ? '#ef4444'
@@ -388,13 +389,10 @@ const TaskItem = memo(function TaskItem({
               const taskDate = task.startDate || getTodayString();
               if (taskDate < goal.startDate || taskDate > goal.targetDate) return null;
               const sched: number[] = parseScheduleDays(goal.scheduleDays);
-              const total = sched.length > 0
-                ? countScheduledDaysInRange(goal.startDate, goal.targetDate, sched)
-                : Math.max(1, Math.round((new Date(goal.targetDate).getTime() - new Date(goal.startDate).getTime()) / 86400000));
-              const elapsed = sched.length > 0
-                ? countScheduledDaysInRange(goal.startDate, taskDate, sched)
-                : Math.max(0, Math.round((new Date(taskDate).getTime() - new Date(goal.startDate).getTime()) / 86400000));
-              const expected = Math.round((goal.startValue + (goal.targetValue - goal.startValue) * (elapsed / total)) * 10) / 10;
+              const effectiveSched = sched.length > 0 ? sched : [0, 1, 2, 3, 4, 5, 6];
+              const total = countScheduledDaysInRange(goal.startDate, goal.targetDate, effectiveSched) || 1;
+              const elapsed = countScheduledDaysInRange(goal.startDate, taskDate, effectiveSched);
+              const expected = Math.round(((goal.startValue ?? 0) + ((goal.targetValue ?? 0) - (goal.startValue ?? 0)) * (elapsed / total)) * 10) / 10;
               return (
                 <span className={`text-[10px] shrink-0 ${outcomeOnTrack ? 'text-green-500 dark:text-green-400' : 'text-red-500 dark:text-red-400'}`}>
                   exp: {expected} {goal.unit}
