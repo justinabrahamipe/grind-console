@@ -98,9 +98,10 @@ export default function GoalProgress({ outcomesData, completionDates, today }: G
           }
 
           return (
-            <div
+            <Link
               key={goal.id}
-              className="relative rounded-xl p-3 overflow-hidden border border-zinc-200 dark:border-zinc-700"
+              href={`/goals/${goal.id}`}
+              className="relative rounded-xl p-3 overflow-hidden border border-zinc-200 dark:border-zinc-700 hover:shadow transition-shadow cursor-pointer block"
             >
               <div
                 className="absolute inset-0 opacity-15 dark:opacity-20"
@@ -123,7 +124,7 @@ export default function GoalProgress({ outcomesData, completionDates, today }: G
                   <span className="text-xs text-zinc-500 dark:text-zinc-400">{subtitle}</span>
                 </div>
               </div>
-            </div>
+            </Link>
           );
         })}
       </div>
