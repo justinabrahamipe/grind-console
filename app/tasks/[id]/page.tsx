@@ -354,9 +354,11 @@ export default function TaskDetailPage() {
                 {formatDate(taskDate, dateFormat)}
               </span>
             )}
-            <span className="text-xs text-zinc-500 dark:text-zinc-400">
-              {task.basePoints} pts
-            </span>
+            {!(goal && (goal.goalType === 'target' || goal.goalType === 'outcome')) && (
+              <span className="text-xs text-zinc-500 dark:text-zinc-400">
+                {task.basePoints} pts
+              </span>
+            )}
             {isCompleted && (
               <span className="text-xs px-2 py-0.5 rounded-full bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 font-medium">
                 Completed
@@ -494,9 +496,11 @@ export default function TaskDetailPage() {
               Until {formatDate(task.endDate, dateFormat)}
             </span>
           )}
-          <span className="text-xs px-2.5 py-1 rounded-full bg-zinc-100 dark:bg-zinc-700 text-zinc-600 dark:text-zinc-400 font-medium">
-            {task.basePoints} pts
-          </span>
+          {!(goal && (goal.goalType === 'target' || goal.goalType === 'outcome')) && (
+            <span className="text-xs px-2.5 py-1 rounded-full bg-zinc-100 dark:bg-zinc-700 text-zinc-600 dark:text-zinc-400 font-medium">
+              {task.basePoints} pts
+            </span>
+          )}
           {isLimitTask && (
             <span className="text-xs px-2 py-1 rounded-full bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400 font-medium">
               Limit

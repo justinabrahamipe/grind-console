@@ -297,7 +297,7 @@ export default function TaskForm({
 
       {/* Points + Task Date */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3 items-end">
-        <div className="min-w-0 overflow-hidden">
+        {!(form.goalId && goals.some(g => g.id === form.goalId && (g.goalType === 'target' || g.goalType === 'outcome'))) && <div className="min-w-0 overflow-hidden">
           <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">Points</label>
           <div className="flex items-center gap-1">
             <button
@@ -356,7 +356,7 @@ export default function TaskForm({
               </div>
             )}
           </div>
-        </div>
+        </div>}
         <div>
           <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">
             {form.frequencyPreset !== 'adhoc' ? 'Start Date' : 'Task Date'} <span className="text-zinc-400 font-normal">(optional)</span>
