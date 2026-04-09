@@ -4,6 +4,7 @@ import { motion } from "framer-motion";
 import { FaBullseye } from "react-icons/fa";
 import Link from "next/link";
 import { getProgressColor } from "@/lib/scoring";
+import { getGoalBadge } from "@/lib/goal-badge";
 import type { OutcomeData } from "@/lib/types";
 
 interface GoalProgressProps {
@@ -68,34 +69,7 @@ export default function GoalProgress({ outcomesData, completionDates, today }: G
             : `${goal.currentValue} / ${goal.targetValue} ${goal.unit}`;
           const progressColor = getProgressColor(progress);
 
-          // Compute trajectory + momentum ratio (skip for project goals — no time-based pace)
-          let trajectory: { label: string; color: string } | null = null;
-          let momentum: { value: number; color: string } | null = null;
-          if (goal.goalType !== 'project' && goal.startDate && goal.targetDate && range !== 0) {
-            const totalMs = new Date(goal.targetDate).getTime() - new Date(goal.startDate).getTime();
-            const elapsedMs = new Date(today > goal.targetDate ? goal.targetDate : today).getTime() - new Date(goal.startDate).getTime();
-            if (totalMs > 0 && elapsedMs >= 0) {
-              const timeProgress = elapsedMs / totalMs;
-              const expectedValue = goal.startValue + range * timeProgress;
-              const isDecrease = goal.targetValue < goal.startValue;
-              const onTrack = isDecrease ? goal.currentValue <= expectedValue : goal.currentValue >= expectedValue;
-              const deviation = Math.abs(goal.currentValue - expectedValue) / Math.abs(range);
-
-              // Momentum: actual progress / expected progress
-              const expectedPct = Math.max(timeProgress * 100, 0.1);
-              const mRatio = Math.round((progress / expectedPct) * 10) / 10;
-              const mColor = mRatio >= 1.0 ? '#22C55E' : '#EF4444';
-              momentum = { value: mRatio, color: mColor };
-
-              if (progress >= 100) {
-                trajectory = { label: 'Done', color: '#22C55E' };
-              } else if (onTrack) {
-                trajectory = { label: deviation > 0.15 ? 'Ahead' : 'On track', color: '#22C55E' };
-              } else {
-                trajectory = { label: deviation > 0.15 ? 'Behind' : 'Slightly behind', color: '#EF4444' };
-              }
-            }
-          }
+          const badge = getGoalBadge(goal, today);
 
           return (
             <Link
@@ -113,9 +87,9 @@ export default function GoalProgress({ outcomesData, completionDates, today }: G
               <div className="relative">
                 <div className="flex items-center justify-between gap-1.5">
                   <div className="text-sm font-semibold text-zinc-900 dark:text-white truncate">{goal.name}</div>
-                  {trajectory && momentum && (
-                    <span className="text-[10px] font-medium shrink-0 px-1.5 py-0.5 rounded-full whitespace-nowrap" style={{ backgroundColor: trajectory.color + '18', color: trajectory.color }}>
-                      {momentum.value.toFixed(1)}x · {trajectory.label}
+                  {badge && (
+                    <span className="text-[10px] font-medium shrink-0 px-1.5 py-0.5 rounded-full whitespace-nowrap" style={{ backgroundColor: badge.color + '18', color: badge.color }}>
+                      {badge.value.toFixed(1)}x · {badge.label}
                     </span>
                   )}
                 </div>

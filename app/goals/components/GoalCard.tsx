@@ -16,6 +16,7 @@ import {
   FaArchive,
 } from "react-icons/fa";
 import { calculateEffortMetrics } from "@/lib/effort-calculations";
+import { getGoalBadge } from "@/lib/goal-badge";
 import { formatDate, parseScheduleDays } from "@/lib/format";
 import { formatScheduleLabel } from "@/lib/constants";
 import { useTheme } from "@/components/ThemeProvider";
@@ -231,13 +232,12 @@ export default function GoalCard({
                 {streak}🔥
               </span>
             )}
-            {!isHabitual && isActivityGoal && effortMetrics && (() => {
-              const momentum = effortMetrics.requiredRate > 0 ? effortMetrics.currentRate / effortMetrics.requiredRate : (effortMetrics.currentRate > 0 ? 2.0 : 1.0);
-              const mRound = Math.round(momentum * 10) / 10;
-              const mColor = mRound >= 1.0 ? targetColor : '#EF4444';
+            {(() => {
+              const badge = getGoalBadge(outcome, today);
+              if (!badge) return null;
               return (
-                <span className="text-xs px-2 py-0.5 rounded-full font-medium shrink-0" style={{ backgroundColor: mColor + '18', color: mColor }}>
-                  {mRound.toFixed(1)}x
+                <span className="text-xs px-2 py-0.5 rounded-full font-medium shrink-0" style={{ backgroundColor: badge.color + '18', color: badge.color }}>
+                  {badge.value.toFixed(1)}x
                 </span>
               );
             })()}

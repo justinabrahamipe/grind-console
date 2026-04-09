@@ -12,7 +12,7 @@ import { useSession } from "next-auth/react";
 import { useRouter, useParams } from "next/navigation";
 import { getCurrentWeekNumber, getGoalStatus, getTotalWeeks } from "@/lib/cycle-scoring";
 import { computeCycleAnalytics } from "@/lib/cycle-analytics";
-import { calculateMomentum } from "@/lib/momentum";
+import { calculateMomentum, calculateTrajectory } from "@/lib/momentum";
 import { parseScheduleDays } from "@/lib/format";
 import type { CycleDetail, GoalForMomentum } from "@/lib/types";
 import { useTheme } from "@/components/ThemeProvider";
@@ -62,28 +62,25 @@ export default function CycleDetailPage() {
   const goalMetrics = useMemo(() => {
     if (!selectedCycle) return { avgMomentum: null as number | null, avgTrajectory: null as number | null };
 
-    // Trajectory from outcome goals
+    // Trajectory from outcome goals (using schedule-aware calculation)
     const outcomeGoals = selectedCycle.goals.filter(g => g.goalType === "outcome" && g.startDate && g.targetDate);
     let avgTrajectory: number | null = null;
     if (outcomeGoals.length > 0) {
       const todayStr = new Date().toISOString().split("T")[0];
-      const trajectories: number[] = [];
-      for (const g of outcomeGoals) {
-        const startDate = g.startDate!;
-        const endDate = g.targetDate!;
-        const totalMs = new Date(endDate).getTime() - new Date(startDate).getTime();
-        if (totalMs <= 0) continue;
-        const effectiveToday = todayStr > endDate ? endDate : todayStr < startDate ? startDate : todayStr;
-        const elapsedMs = new Date(effectiveToday).getTime() - new Date(startDate).getTime();
-        const timeProgress = elapsedMs / totalMs;
-        const range = g.targetValue - (g.startValue || 0);
-        if (range === 0) continue;
-        const expectedValue = (g.startValue || 0) + range * timeProgress;
-        const deviation = (g.currentValue - expectedValue) / range;
-        trajectories.push(1.0 + deviation);
-      }
-      if (trajectories.length > 0) {
-        avgTrajectory = Math.round(trajectories.reduce((a, b) => a + b, 0) / trajectories.length * 10) / 10;
+      const goalsForTrajectory: GoalForMomentum[] = outcomeGoals.map(g => ({
+        id: g.id,
+        goalType: g.goalType,
+        targetValue: g.targetValue,
+        currentValue: g.currentValue,
+        startValue: g.startValue || 0,
+        startDate: g.startDate ?? selectedCycle.startDate,
+        targetDate: g.targetDate ?? selectedCycle.endDate,
+        scheduleDays: g.scheduleDays ?? null,
+        pillarId: g.pillarId ?? null,
+      }));
+      const trajectoryResult = calculateTrajectory(goalsForTrajectory, todayStr);
+      if (trajectoryResult.goals.length > 0) {
+        avgTrajectory = Math.round(trajectoryResult.overall * 10) / 10;
       }
     }
 
