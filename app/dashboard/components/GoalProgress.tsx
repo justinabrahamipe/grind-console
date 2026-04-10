@@ -69,8 +69,9 @@ export default function GoalProgress({ outcomesData, completionDates, today }: G
           const progress = range === 0 ? 0 : Math.round(Math.min(
             (goal.currentValue - goal.startValue) / range * 100, 100
           ));
-          const progressColor = getProgressColor(progress);
           const badge = getGoalBadge(goal, today);
+          // Show green if on track or ahead, otherwise use progress-based color
+          const progressColor = badge ? badge.color : getProgressColor(progress);
           const subtitle = goal.goalType === 'project' && goal.targetValue === 0
             ? 'No steps yet'
             : `${fmtNum(goal.currentValue)}/${fmtNum(goal.targetValue)}`;
