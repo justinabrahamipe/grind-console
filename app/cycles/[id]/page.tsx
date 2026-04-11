@@ -429,7 +429,13 @@ export default function CycleDetailPage() {
                           <span>{goal.unit}</span>
                         ) : null}
                         {adherence !== null && (
-                          <span className={`font-medium ${adherence >= 80 ? "text-green-600 dark:text-green-400" : adherence >= 50 ? "text-amber-600 dark:text-amber-400" : "text-red-600 dark:text-red-400"}`}>
+                          <span className={`font-medium ${
+                            adherence >= 95 ? "text-green-600 dark:text-green-400" :
+                            adherence >= 75 ? "text-emerald-600 dark:text-emerald-400" :
+                            adherence >= 50 ? "text-amber-600 dark:text-amber-400" :
+                            adherence >= 25 ? "text-orange-600 dark:text-orange-400" :
+                            "text-red-600 dark:text-red-400"
+                          }`}>
                             {adherence}%
                           </span>
                         )}
