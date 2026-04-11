@@ -1,4 +1,4 @@
-import { countScheduledDaysInRange, calculateEffortMetrics } from './effort-calculations';
+import { calculateEffortMetrics } from './effort-calculations';
 import { parseScheduleDays } from './format';
 
 export interface GoalBadge {
@@ -53,31 +53,30 @@ export function getGoalBadge(goal: {
     return { value: val, label, color };
   }
 
-  // Outcome goals: schedule-aware trajectory using today as elapsed end (matches task "exp:" display)
+  // Outcome goals: gap from the linear start→target line at "today".
+  // Compute where the line says the value should be right now, take the
+  // signed gap (positive = ahead of where you should be, in the goal's
+  // intended direction), and express it as a 1.0x-centered multiplier
+  // bounded to [0, 2]. 1.0 = exactly on the line. A full goal-worth
+  // ahead = 2.0, a full goal-worth behind = 0.0. Calendar-day based
+  // (schedule days don't make sense for outcome metrics like weight).
   const effectiveToday = today > goal.targetDate ? goal.targetDate : today;
+  const startMs = new Date(goal.startDate + 'T00:00:00').getTime();
+  const endMs = new Date(goal.targetDate + 'T00:00:00').getTime();
+  const todayMs = new Date(effectiveToday + 'T00:00:00').getTime();
+  const totalMs = endMs - startMs;
+  const timeProgress = totalMs > 0
+    ? Math.max(0, Math.min(todayMs - startMs, totalMs)) / totalMs
+    : 0;
 
-  let totalDays: number;
-  let elapsedDays: number;
-  if (sched.length > 0) {
-    totalDays = countScheduledDaysInRange(goal.startDate, goal.targetDate, sched);
-    elapsedDays = countScheduledDaysInRange(goal.startDate, effectiveToday, sched);
-  } else {
-    totalDays = Math.max(1, Math.round((new Date(goal.targetDate).getTime() - new Date(goal.startDate).getTime()) / 86400000) + 1);
-    elapsedDays = Math.max(1, Math.round((new Date(effectiveToday).getTime() - new Date(goal.startDate).getTime()) / 86400000) + 1);
-  }
-
-  if (totalDays <= 0 || elapsedDays <= 0) return { value: 1.0, label: 'On track', color: '#22C55E' };
-
-  const timeProgress = elapsedDays / totalDays;
+  const expectedValue = goal.startValue + timeProgress * range;
   const isDecrease = goal.targetValue < goal.startValue;
   const totalDelta = Math.abs(range);
-  const actualDelta = isDecrease
-    ? Math.max(0, goal.startValue - goal.currentValue)
-    : Math.max(0, goal.currentValue - goal.startValue);
-  const expectedDelta = timeProgress * totalDelta;
-
-  const momentum = expectedDelta > 0 ? actualDelta / expectedDelta : (actualDelta > 0 ? 2.0 : 1.0);
-  const val = Math.round(momentum * 10) / 10;
+  const gap = isDecrease
+    ? expectedValue - goal.currentValue
+    : goal.currentValue - expectedValue;
+  const gapFrac = totalDelta > 0 ? gap / totalDelta : 0;
+  const val = Math.round(Math.max(0, Math.min(2, 1 + gapFrac)) * 10) / 10;
   const label = val >= 1.05 ? 'Ahead' : val >= 0.95 ? 'On track' : val >= 0.8 ? 'Slightly behind' : 'Behind';
   const color = val >= 0.95 ? '#22C55E' : '#EF4444';
 
