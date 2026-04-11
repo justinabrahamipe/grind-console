@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getAuthenticatedUserId, errorResponse } from "@/lib/api-utils";
-import { db, goals, pillars } from "@/lib/db";
+import { db, goals, pillars, cycles } from "@/lib/db";
 import { eq } from "drizzle-orm";
 import { getGoalBadge } from "@/lib/goal-badge";
 
@@ -10,8 +10,8 @@ export async function GET() {
 
     const today = new Date().toISOString().split("T")[0];
 
-    // Fetch goals and pillars in parallel
-    const [userGoals, userPillars] = await Promise.all([
+    // Fetch goals, pillars, and cycles in parallel
+    const [allUserGoals, userPillars, userCycles] = await Promise.all([
       db
         .select()
         .from(goals)
@@ -20,7 +20,23 @@ export async function GET() {
         .select()
         .from(pillars)
         .where(eq(pillars.userId, userId)),
+      db
+        .select()
+        .from(cycles)
+        .where(eq(cycles.userId, userId)),
     ]);
+
+    // Match dashboard GoalProgress visibility: only goals that are active and either
+    // unattached to a cycle or attached to an active cycle. Stale/archived goals
+    // shouldn't drag the trajectory average.
+    const activeCycleIds = new Set(
+      userCycles
+        .filter(c => c.startDate <= today && c.endDate >= today)
+        .map(c => c.id)
+    );
+    const userGoals = allUserGoals.filter(g =>
+      g.status === 'active' && (g.periodId == null || activeCycleIds.has(g.periodId))
+    );
 
     const mappedGoals = userGoals.map(g => ({
       id: g.id,
