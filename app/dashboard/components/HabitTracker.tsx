@@ -61,9 +61,16 @@ export default function HabitTracker({ outcomesData, completionDates, today }: H
           <FaFire className="text-lg text-orange-500" />
           <h2 className="text-lg font-semibold text-zinc-900 dark:text-white">Habits</h2>
         </div>
-        <div className="flex items-center gap-2 text-[10px] text-zinc-400 dark:text-zinc-500">
-          <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-green-500 inline-block" /> Hit</span>
-          <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-amber-400 inline-block" /> Partial</span>
+        <div className="flex items-center gap-2 text-[10px] text-zinc-400 dark:text-zinc-500 flex-wrap justify-end">
+          <span className="flex items-center gap-0.5">
+            <span>Low</span>
+            <span className="w-2.5 h-2.5 rounded-sm bg-red-400 inline-block ml-1" />
+            <span className="w-2.5 h-2.5 rounded-sm bg-orange-400 inline-block" />
+            <span className="w-2.5 h-2.5 rounded-sm bg-amber-400 inline-block" />
+            <span className="w-2.5 h-2.5 rounded-sm bg-emerald-500 dark:bg-emerald-400 inline-block" />
+            <span className="w-2.5 h-2.5 rounded-sm bg-green-500 dark:bg-green-400 inline-block" />
+            <span className="ml-1">High</span>
+          </span>
           <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-blue-400 inline-block" /> Today</span>
           <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-red-400 inline-block" /> Miss</span>
           <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-zinc-200 dark:bg-zinc-700 inline-block" /> Rest</span>
@@ -91,6 +98,13 @@ export default function HabitTracker({ outcomesData, completionDates, today }: H
   );
 }
 
+type CellStatus =
+  | { kind: 'hit'; pct: number }
+  | { kind: 'today' }
+  | { kind: 'off' }
+  | { kind: 'missed' }
+  | { kind: 'future' };
+
 function HabitRow({ goal, completionDates, today, days }: { goal: OutcomeData; completionDates: Record<number, { date: string; value: number; completed: boolean }[]>; today: string; days: string[] }) {
   const scheduleDays: number[] = parseScheduleDays(goal.scheduleDays);
   const entries = completionDates[goal.id] || [];
@@ -106,23 +120,25 @@ function HabitRow({ goal, completionDates, today, days }: { goal: OutcomeData; c
       }
     }
 
-    const cellData = days.map(dateStr => {
+    const cellData: CellStatus[] = days.map(dateStr => {
       const d = new Date(dateStr + 'T12:00:00');
       const dow = d.getDay();
       const isScheduled = scheduleDays.length === 0 || scheduleDays.includes(dow);
       const isBeforeStart = goal.startDate && dateStr < goal.startDate;
       const isFuture = dateStr > today;
 
-      if (isBeforeStart || isFuture) return 'future';
-      if (!isScheduled) return 'off';
+      if (isBeforeStart || isFuture) return { kind: 'future' };
+      if (!isScheduled) return { kind: 'off' };
       if (dateValues.has(dateStr)) {
         const val = dateValues.get(dateStr) || 0;
-        if (goal.dailyTarget && goal.completionType !== 'checkbox' && val < goal.dailyTarget) return 'partial';
-        return 'done';
+        const pct = goal.dailyTarget && goal.completionType !== 'checkbox'
+          ? Math.round((val / goal.dailyTarget) * 100)
+          : 100;
+        return { kind: 'hit', pct };
       }
-      if (postponedSet.has(dateStr)) return 'off';
-      if (dateStr === today) return 'today';
-      return 'missed';
+      if (postponedSet.has(dateStr)) return { kind: 'off' };
+      if (dateStr === today) return { kind: 'today' };
+      return { kind: 'missed' };
     });
 
     // Adherence
@@ -149,14 +165,18 @@ function HabitRow({ goal, completionDates, today, days }: { goal: OutcomeData; c
     return { cells: cellData, adherence: adh };
   }, [entries, today, days, goal.startDate, goal.dailyTarget, goal.completionType, scheduleDays]);
 
-  const getCellClass = (status: string) => {
-    switch (status) {
-      case 'done': return 'bg-green-500 dark:bg-green-400';
-      case 'partial': return 'bg-amber-400';
+  const getCellClass = (cell: CellStatus) => {
+    switch (cell.kind) {
+      case 'hit':
+        if (cell.pct >= 95) return 'bg-green-500 dark:bg-green-400';
+        if (cell.pct >= 75) return 'bg-emerald-500 dark:bg-emerald-400';
+        if (cell.pct >= 50) return 'bg-amber-400';
+        if (cell.pct >= 25) return 'bg-orange-400';
+        return 'bg-red-400';
       case 'today': return 'bg-blue-400 dark:bg-blue-500 ring-1 ring-blue-500/50';
       case 'missed': return 'bg-red-400 dark:bg-red-500/70';
       case 'off': return 'bg-zinc-200 dark:bg-zinc-700';
-      default: return 'bg-zinc-100 dark:bg-zinc-800 opacity-30';
+      case 'future': return 'bg-zinc-100 dark:bg-zinc-800 opacity-30';
     }
   };
 
@@ -167,13 +187,17 @@ function HabitRow({ goal, completionDates, today, days }: { goal: OutcomeData; c
         <span className="text-xs font-medium text-zinc-700 dark:text-zinc-300 truncate">{goal.name}</span>
       </div>
       <div className="flex gap-0.5 shrink-0 ml-2">
-        {cells.map((status, i) => (
-          <div key={i} className={`w-3.5 h-3.5 rounded-sm shrink-0 ${getCellClass(status)}`} />
+        {cells.map((cell, i) => (
+          <div key={i} className={`w-3.5 h-3.5 rounded-sm shrink-0 ${getCellClass(cell)}`} />
         ))}
       </div>
       <div className="w-11 shrink-0 text-right pl-1">
         <span className={`text-[11px] font-semibold ${
-          adherence >= 80 ? 'text-green-500' : adherence >= 50 ? 'text-amber-500' : 'text-red-500'
+          adherence >= 95 ? 'text-green-500' :
+          adherence >= 75 ? 'text-emerald-500' :
+          adherence >= 50 ? 'text-amber-500' :
+          adherence >= 25 ? 'text-orange-500' :
+          'text-red-500'
         }`}>{adherence}%</span>
       </div>
     </Link>
