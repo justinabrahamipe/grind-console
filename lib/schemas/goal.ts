@@ -15,7 +15,7 @@ export const GOAL_STATUSES = ["active", "completed", "abandoned"] as const;
 const goalFields = {
   name: strField().describe("Goal name."),
   pillarId: intField().describe("Pillar ID to link to. Pass 0 or null to unlink."),
-  startValue: numField().describe("Starting value (e.g. current weight). Defaults to 0."),
+  startValue: numField().describe("Baseline reference point, NOT current progress. For count-up goals (apps sent, books read, pages written) this is almost always 0 — do not set it to the user's current progress. Only set a non-zero value for metrics tracked from a non-zero baseline (e.g. current weight when tracking weight loss). Defaults to 0."),
   targetValue: numField().describe("Target value to reach. Required for outcome/target goals; project goals start at 0 and grow as subtasks are added."),
   unit: strField().describe("Unit of measurement (e.g. 'kg', 'pages'). Project goals default to 'steps'."),
   startDate: nullableStrField().describe("Start date (YYYY-MM-DD)."),

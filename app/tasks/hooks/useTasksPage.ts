@@ -390,12 +390,16 @@ export function useTasksPage() {
       // Initial fetch uses server-filtered path for today/yesterday/tomorrow/single
       if (filters.date.type === 'today') {
         fetchDateTasks(today);
+        fetchScore(today);
       } else if (filters.date.type === 'yesterday') {
         fetchDateTasks(yesterday);
+        fetchScore(yesterday);
       } else if (filters.date.type === 'tomorrow') {
         fetchDateTasks(tomorrow);
+        fetchScore(today);
       } else if (filters.date.type === 'single' && filters.date.value) {
         fetchDateTasks(filters.date.value);
+        fetchScore(filters.date.value < today ? filters.date.value : today);
       } else {
         fetchTasks();
       }
