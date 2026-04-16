@@ -761,7 +761,7 @@ export default function GoalDetailPage() {
                   task={task}
                   hidePillar
                   showDate={task.startDate ? formatDate(task.startDate, dateFormat) : undefined}
-                  goalsList={[]}
+                  goalsList={outcome ? [outcome] : []}
                   cycles={cycles}
                   maxStarsReached={true}
                   timers={timers}
