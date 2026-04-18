@@ -33,6 +33,16 @@ export function calculateTaskScore(task: TaskForScoring, completion: CompletionF
   return completion.value && completion.value > 0 ? task.basePoints : 0;
 }
 
+export function calculateRemainingPoints(
+  task: TaskForScoring,
+  completion: CompletionForScoring | null | undefined,
+): number {
+  const mult = completion?.isHighlighted ? 2 : 1;
+  const max = task.basePoints * mult;
+  const earned = completion ? calculateTaskScore(task, completion) * mult : 0;
+  return Math.max(0, max - Math.max(0, earned));
+}
+
 export function calculateDailyScore(
   completions: CompletionForScoring[],
   tasksForDay: TaskForScoring[],
