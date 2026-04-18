@@ -6,6 +6,7 @@ import { FaPlus, FaChevronDown, FaChevronRight } from "react-icons/fa";
 import AdBanner from "@/app/(common)/AdBanner";
 import { Snackbar, Alert as MuiAlert } from "@mui/material";
 import { formatDate } from "@/lib/format";
+import { calculateRemainingPoints } from "@/lib/scoring";
 import { useTasksPage } from "./hooks/useTasksPage";
 import DateNavigation from "./components/DateNavigation";
 import TaskItem from "./components/TaskItem";
@@ -72,11 +73,7 @@ export default function TasksPage() {
       const aStarred = a.completion?.isHighlighted ? 1 : 0;
       const bStarred = b.completion?.isHighlighted ? 1 : 0;
       if (aStarred !== bStarred) return bStarred - aStarred;
-      const aSkipped = a.completion?.skipped ? 1 : 0;
-      const bSkipped = b.completion?.skipped ? 1 : 0;
-      const aDone = a.completion?.completed || (a.target != null && a.target > 0 && (a.completion?.value || 0) >= a.target) ? 1 : 0;
-      const bDone = b.completion?.completed || (b.target != null && b.target > 0 && (b.completion?.value || 0) >= b.target) ? 1 : 0;
-      return (aSkipped || aDone) - (bSkipped || bDone);
+      return calculateRemainingPoints(b, b.completion) - calculateRemainingPoints(a, a.completion);
     }), [groups]);
 
   const starredCount = useMemo(() => allEnrichedTasks.filter(t => t.completion?.isHighlighted).length, [allEnrichedTasks]);
