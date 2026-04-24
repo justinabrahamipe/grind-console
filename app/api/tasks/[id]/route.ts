@@ -96,6 +96,17 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
 
       const updateData = mapTaskUpdateFields(body);
 
+      // Track original date on first postpone/prepone — so adhoc tasks (which
+      // don't get originalDate at creation) also show the "Originally" cell.
+      if (
+        typeof updateData.date === 'string' &&
+        updateData.date !== existing.date &&
+        !existing.originalDate &&
+        existing.date
+      ) {
+        updateData.originalDate = existing.date;
+      }
+
       const [updated] = await db
         .update(tasks)
         .set(updateData)
