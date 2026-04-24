@@ -5,6 +5,7 @@ import { eq, and } from "drizzle-orm";
 import { createAutoLog, logGoalStatusChange } from "@/lib/auto-log";
 import { getTodayString } from "@/lib/format";
 import { deleteFutureUncompletedTasks, regenerateGoalTasksIfNeeded } from "@/lib/goal-mutations";
+import { invalidateTaskCache, ensureUpcomingTasks } from "@/lib/ensure-upcoming-tasks";
 import { getOwnedGoal } from "@/lib/db-utils";
 import { mapGoalUpdateFields, buildGoalPropagationPair } from "@/lib/goal-utils";
 
@@ -42,6 +43,18 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
     }
     if (body.autoCreateTasks === false && existing.autoCreateTasks) {
       await deleteFutureUncompletedTasks(outcomeId, userId);
+    }
+
+    // Status changes must invalidate the upcoming-tasks cache so schedules
+    // tied to this goal either stop regenerating (abandon/complete) or resume
+    // regenerating (reactivate) on the next GET /api/tasks.
+    if (body.status && body.status !== existing.status) {
+      invalidateTaskCache(userId);
+      // On reactivate, run the generator right away so schedule-based tasks
+      // come back before the client refetches.
+      if (body.status === 'active' && existing.status !== 'active') {
+        await ensureUpcomingTasks(userId);
+      }
     }
 
     // Prune stale tasks and (re)generate for range/schedule changes
