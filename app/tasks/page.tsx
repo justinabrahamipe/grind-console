@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef } from "react";
 import { motion } from "framer-motion";
 import { FaPlus, FaChevronDown, FaChevronRight } from "react-icons/fa";
 import AdBanner from "@/app/(common)/AdBanner";
@@ -37,6 +37,7 @@ export default function TasksPage() {
     pendingRange,
     setPendingRange,
     scoreSummary,
+    sortVersion,
     timers,
     pendingValues,
     setPendingValues,
@@ -65,16 +66,37 @@ export default function TasksPage() {
     filters.date.type === 'tomorrow' ||
     (filters.date.type === 'single' && !!filters.date.value);
 
-  // Build enriched + sorted task list (memoized)
-  const allEnrichedTasks: EnrichedTask[] = useMemo(() =>
-    groups.flatMap((group) =>
+  // Sort keys are frozen per-task and only re-snapshot when a full fetch
+  // bumps `sortVersion`. Incrementing a count/timer/numeric value does not
+  // bump the version, so the task stays in place until the next refresh.
+  const sortKeysRef = useRef<Map<number, { starred: boolean; remaining: number }>>(new Map());
+  const lastSortVersionRef = useRef<number>(-1);
+
+  const allEnrichedTasks: EnrichedTask[] = useMemo(() => {
+    const enriched = groups.flatMap((group) =>
       group.tasks.map((task) => ({ ...task, _pillarColor: group.pillar.color, _pillarEmoji: group.pillar.emoji, _pillarName: group.pillar.name }))
-    ).sort((a, b) => {
-      const aStarred = a.completion?.isHighlighted ? 1 : 0;
-      const bStarred = b.completion?.isHighlighted ? 1 : 0;
+    );
+    if (lastSortVersionRef.current !== sortVersion) {
+      sortKeysRef.current.clear();
+      lastSortVersionRef.current = sortVersion;
+    }
+    for (const t of enriched) {
+      if (!sortKeysRef.current.has(t.id)) {
+        sortKeysRef.current.set(t.id, {
+          starred: !!t.completion?.isHighlighted,
+          remaining: calculateRemainingPoints(t, t.completion),
+        });
+      }
+    }
+    return enriched.sort((a, b) => {
+      const ka = sortKeysRef.current.get(a.id)!;
+      const kb = sortKeysRef.current.get(b.id)!;
+      const aStarred = ka.starred ? 1 : 0;
+      const bStarred = kb.starred ? 1 : 0;
       if (aStarred !== bStarred) return bStarred - aStarred;
-      return calculateRemainingPoints(b, b.completion) - calculateRemainingPoints(a, a.completion);
-    }), [groups]);
+      return kb.remaining - ka.remaining;
+    });
+  }, [groups, sortVersion]);
 
   const starredCount = useMemo(() => allEnrichedTasks.filter(t => t.completion?.isHighlighted).length, [allEnrichedTasks]);
   const maxStarsReached = starredCount >= 3;

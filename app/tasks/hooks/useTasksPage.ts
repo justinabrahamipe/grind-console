@@ -162,6 +162,7 @@ export function useTasksPage() {
   const { dateFormat } = useTheme();
   const router = useRouter();
   const groupsRef = useRef<TaskGroup[]>([]);
+  const lastFetchAtRef = useRef(0);
   const [groups, _setGroups] = useState<TaskGroup[]>(() => {
     if (typeof window !== 'undefined') {
       try {
@@ -185,6 +186,10 @@ export function useTasksPage() {
   const [goalsList, setGoalsList] = useState<Outcome[]>([]);
   const [cycles, setCycles] = useState<Cycle[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
+  // Bumped every time a full fetch completes; the page uses this to decide
+  // when to re-snapshot the task sort order (so a count/timer/numeric change
+  // doesn't reshuffle the list under the user's finger).
+  const [sortVersion, setSortVersion] = useState(0);
 
   // Fuzzy-filter the visible task list. Returns groups containing only matching tasks; empty groups are dropped.
   const filteredGroups = useMemo(() => {
@@ -464,6 +469,8 @@ export function useTasksPage() {
         saveTasksCache(data, [], scoreSummary);
       }
       await fetchScore(today);
+      lastFetchAtRef.current = Date.now();
+      setSortVersion(v => v + 1);
     } catch (error) {
       console.error("Failed to fetch tasks:", error);
     } finally {
@@ -524,6 +531,8 @@ export function useTasksPage() {
           saveTasksCache(newGroups, newNoDateTasks, scoreSummary);
         }
       }
+      lastFetchAtRef.current = Date.now();
+      setSortVersion(v => v + 1);
     } catch (error) {
       console.error("Failed to fetch tasks for date:", error);
     } finally {
@@ -544,7 +553,26 @@ export function useTasksPage() {
       await fetchTasks();
     }
     await fetchScore(viewDate);
+    lastFetchAtRef.current = Date.now();
   };
+
+  // Refetch on tab focus / visibility so cross-device changes show up
+  useEffect(() => {
+    if (status !== 'authenticated') return;
+    const DEBOUNCE_MS = 10_000;
+    const maybeRefresh = () => {
+      if (document.visibilityState !== 'visible') return;
+      if (Date.now() - lastFetchAtRef.current < DEBOUNCE_MS) return;
+      refreshView();
+    };
+    window.addEventListener('focus', maybeRefresh);
+    document.addEventListener('visibilitychange', maybeRefresh);
+    return () => {
+      window.removeEventListener('focus', maybeRefresh);
+      document.removeEventListener('visibilitychange', maybeRefresh);
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [status, filters.date.type, filters.date.value, viewDate]);
 
   // --- Completion handlers ---
   const handleComplete = useCallback(async (taskId: number, completed?: boolean, value?: number) => {
@@ -1019,6 +1047,7 @@ export function useTasksPage() {
     pendingRange,
     setPendingRange,
     scoreSummary,
+    sortVersion,
     // Timers & pending
     timers,
     pendingValues,
