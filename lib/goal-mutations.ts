@@ -40,7 +40,9 @@ export async function deleteFutureUncompletedTasks(goalId: number, userId: strin
       eq(tasks.userId, userId),
       eq(tasks.completed, false),
     ));
-  const futureIds = futureTasks.filter(t => t.date > todayStr).map(t => t.id);
+  // Include today — abandoning a goal means the user is done, so today's
+  // uncompleted task should go too.
+  const futureIds = futureTasks.filter(t => t.date && t.date >= todayStr).map(t => t.id);
   await deleteTasksByIds(futureIds);
 }
 
@@ -50,7 +52,8 @@ export async function regenerateGoalTasksIfNeeded(goalId: number, userId: string
     body.targetDate !== undefined ||
     body.startDate !== undefined ||
     body.scheduleDays !== undefined ||
-    (body.autoCreateTasks === true && !existing.autoCreateTasks)
+    (body.autoCreateTasks === true && !existing.autoCreateTasks) ||
+    (body.status === 'active' && existing.status !== 'active')
   );
   if (!rangeOrScheduleChanged) return;
 

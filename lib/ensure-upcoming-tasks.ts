@@ -63,10 +63,30 @@ async function _ensureUpcomingTasksInner(userId: string, todayStr: string) {
     ));
 
   // Get all active schedules for this user
-  const allSchedules = await db
+  const allSchedulesRaw = await db
     .select()
     .from(taskSchedules)
     .where(eq(taskSchedules.userId, userId));
+
+  if (allSchedulesRaw.length === 0) {
+    lastRunCache.set(userId, todayStr);
+    return;
+  }
+
+  // Skip schedules whose linked goal is abandoned or completed — those
+  // shouldn't keep producing new task instances after the goal is closed.
+  const linkedGoalIds = Array.from(new Set(allSchedulesRaw.map(s => s.goalId).filter((g): g is number => !!g)));
+  const inactiveGoalIds = new Set<number>();
+  if (linkedGoalIds.length > 0) {
+    const linkedGoals = await db
+      .select({ id: goals.id, status: goals.status })
+      .from(goals)
+      .where(and(eq(goals.userId, userId), inArray(goals.id, linkedGoalIds)));
+    for (const g of linkedGoals) {
+      if (g.status !== 'active') inactiveGoalIds.add(g.id);
+    }
+  }
+  const allSchedules = allSchedulesRaw.filter(s => !s.goalId || !inactiveGoalIds.has(s.goalId));
 
   if (allSchedules.length === 0) {
     lastRunCache.set(userId, todayStr);

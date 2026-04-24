@@ -201,11 +201,14 @@ export default function GoalDetailPage() {
   const [newTaskDate, setNewTaskDate] = useState("");
   const [addingTask, setAddingTask] = useState(false);
 
-  const refreshLinkedTasks = async () => {
+  const refreshLinkedTasks = async (opts?: { includeLog?: boolean }) => {
     if (!outcome) return;
-    const [goalsData, goalTasks] = await Promise.all([
+    const [goalsData, goalTasks, logData] = await Promise.all([
       fetch("/api/goals").then(r => r.ok ? r.json() : []),
       fetch("/api/goals/tasks").then(r => r.ok ? r.json() : []),
+      opts?.includeLog
+        ? fetch(`/api/goals/${id}/log`).then(r => r.ok ? r.json() : [])
+        : Promise.resolve(null),
     ]);
     const found = (goalsData as Outcome[]).find(o => String(o.id) === id);
     if (found) setOutcome(found);
@@ -220,6 +223,7 @@ export default function GoalDetailPage() {
         completion: { id: t.id, taskId: t.id, completed: t.completed, value: t.value, pointsEarned: 0, isHighlighted: false, skipped: !t.completed && (t.value === null || t.value === 0) && t.date < todayStr, timerStartedAt: null },
       } as EnrichedTask));
     setLinkedTasks(tasks);
+    if (logData) setLogs(logData as LogEntry[]);
   };
 
   const handleAddSubtask = async () => {
@@ -416,7 +420,9 @@ export default function GoalDetailPage() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ status: newStatus }),
         });
-        setOutcome({ ...outcome, status: newStatus });
+        // Refresh linked tasks + log so the reactivated/deleted instances
+        // and the status-change log entry show up without a manual reload.
+        await refreshLinkedTasks({ includeLog: true });
         setArchiving(false);
       },
     });
@@ -442,29 +448,7 @@ export default function GoalDetailPage() {
       const res = await fetch(`/api/goals/${outcome.id}/generate-tasks`, { method: "POST" });
       if (res.ok) {
         setSnackbar({ open: true, message: "Tasks generated successfully", severity: "success" });
-        // Refresh everything — same as initial load
-        const [goalsData, logData, goalTasks, completions] = await Promise.all([
-          fetch("/api/goals").then(r => r.ok ? r.json() : []),
-          fetch(`/api/goals/${outcome.id}/log`).then(r => r.ok ? r.json() : []),
-          fetch("/api/goals/tasks").then(r => r.ok ? r.json() : []),
-          fetch("/api/goals/completions").then(r => r.ok ? r.json() : {}),
-        ]);
-        const found = goalsData.find((o: Outcome) => String(o.id) === String(outcome.id));
-        if (found) setOutcome(found);
-        setLogs(logData);
-        const goalCompletions = (completions as Record<number, { date: string; value: number; completed: boolean }[]>)[outcome.id] || [];
-        const todayStr = new Date().toISOString().split('T')[0];
-        const newTasks: EnrichedTask[] = goalTasks
-          .filter((t: { goalId: number }) => t.goalId === outcome.id)
-          .map((t: { id: number; name: string; goalId: number; completionType: string; basePoints: number; target: number | null; unit: string | null; date: string; completed: boolean; value: number | null }) => ({
-            id: t.id, name: t.name, goalId: t.goalId, pillarId: 0, frequency: "adhoc",
-            customDays: null, repeatInterval: null, completionType: t.completionType || "checkbox",
-            basePoints: t.basePoints || 0, target: t.target, unit: t.unit, startDate: t.date, date: t.date,
-            periodId: null, _pillarColor: color, _pillarEmoji: '', _pillarName: '',
-            completion: { id: t.id, taskId: t.id, completed: t.completed, value: t.value, pointsEarned: 0, isHighlighted: false, skipped: !t.completed && (t.value === null || t.value === 0) && t.date < todayStr, timerStartedAt: null },
-          } as EnrichedTask));
-        setLinkedTasks(newTasks);
-        setTaskCompletionDates(goalCompletions);
+        await refreshLinkedTasks({ includeLog: true });
       } else {
         setSnackbar({ open: true, message: "Failed to generate tasks", severity: "error" });
       }
