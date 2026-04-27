@@ -99,14 +99,14 @@ export async function POST(request: Request) {
       completionType: data.completionType || 'checkbox',
       dailyTarget: data.dailyTarget ?? null,
       scheduleDays: (transformed.scheduleDays as string | null) ?? null,
-      autoCreateTasks: data.autoCreateTasks || false,
+      autoCreateTasks: isProject ? false : (data.autoCreateTasks || false),
       flexibilityRule: data.flexibilityRule || 'must_today',
       limitValue: data.limitValue ?? null,
       basePoints: data.basePoints ?? 10,
     }).returning();
 
     // Generate all tasks upfront for the full goal date range
-    if (data.autoCreateTasks) {
+    if (!isProject && data.autoCreateTasks) {
       await generateGoalTasks(userId, outcome.id);
     }
 

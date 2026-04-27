@@ -58,7 +58,7 @@ export async function handleCreateGoal(args: any, userId: string): Promise<strin
     completionType: args.completionType || 'checkbox',
     dailyTarget: args.dailyTarget ?? null,
     scheduleDays: scheduleDays ? JSON.stringify(scheduleDays) : null,
-    autoCreateTasks: args.autoCreateTasks === true || args.autoCreateTasks === 'true' || isActivityGoal,
+    autoCreateTasks: !isProject && (args.autoCreateTasks === true || args.autoCreateTasks === 'true' || isActivityGoal),
     flexibilityRule: args.flexibilityRule || 'must_today',
     limitValue: args.limitValue ?? null,
     basePoints: args.basePoints ?? 10,
@@ -81,8 +81,13 @@ export async function handleEditGoal(args: any, userId: string): Promise<string>
   const existing = await getOwnedGoal(goalId, userId);
   if (!existing) return "Error: Goal not found.";
 
+  const isProject = existing.goalType === 'project';
+
   const updateData = mapGoalUpdateFields(args);
   if (Object.keys(updateData).length === 0) return "Error: No fields to update.";
+
+  // Project goals never auto-create daily tasks — their subtasks are added by the user.
+  if (isProject) updateData.autoCreateTasks = false;
 
   // Auto-complete target/outcome goals when marked completed
   if (args.status === 'completed' && (existing.goalType === 'target' || existing.goalType === 'outcome')) {
@@ -105,7 +110,7 @@ export async function handleEditGoal(args: any, userId: string): Promise<string>
   await regenerateGoalTasksIfNeeded(goalId, userId, existing, args, null);
 
   // Propagate changes to linked uncompleted tasks and their schedules
-  const { tasks: propagateToTasks, schedules: propagateToSchedules } = buildGoalPropagationPair(args);
+  const { tasks: propagateToTasks, schedules: propagateToSchedules } = buildGoalPropagationPair(args, existing.goalType);
 
   if (Object.keys(propagateToTasks).length > 0) {
     const todayStr = getTodayString();

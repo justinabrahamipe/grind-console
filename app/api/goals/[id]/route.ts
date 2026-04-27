@@ -22,7 +22,12 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
 
+    const isProject = existing.goalType === 'project';
+
     const updateData = mapGoalUpdateFields(body);
+
+    // Project goals never auto-create daily tasks — their subtasks are added by the user.
+    if (isProject) updateData.autoCreateTasks = false;
 
     // When marking a target/outcome goal as complete, set currentValue = targetValue
     if (body.status === 'completed' && (existing.goalType === 'target' || existing.goalType === 'outcome')) {
@@ -61,7 +66,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
     await regenerateGoalTasksIfNeeded(outcomeId, userId, existing, body, updated);
 
     // Propagate changes to linked uncompleted tasks and their schedules
-    const { tasks: propagateToTasks, schedules: propagateToSchedules } = buildGoalPropagationPair(body);
+    const { tasks: propagateToTasks, schedules: propagateToSchedules } = buildGoalPropagationPair(body, existing.goalType);
 
     if (Object.keys(propagateToTasks).length > 0) {
       const linkedTasks = await db
