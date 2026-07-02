@@ -72,6 +72,9 @@ export function computeCycleAnalytics(
       totalCompletion += Math.max(0, Math.min(g.adherence, 100));
       totalProjected += Math.max(0, Math.min(g.maxPossible ?? g.adherence, 100));
       countable++;
+    } else if (isHabitual) {
+      // adherence is null — no sessions scheduled yet; skip to avoid range===0 fallthrough
+      continue;
     } else {
       const start = g.startValue || 0;
       const range = g.targetValue - start;

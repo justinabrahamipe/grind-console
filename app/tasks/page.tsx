@@ -26,6 +26,7 @@ export default function TasksPage() {
     loading,
     refreshing,
     noDateTasks,
+    overdueTasks,
     filters,
     setFilters,
     searchQuery,
@@ -239,21 +240,41 @@ export default function TasksPage() {
             handleDelete={handleDelete}
             getScheduleLabel={getScheduleLabel}
           />
-        ) : refreshing && filteredTasks.length === 0 ? (
-          <div className="space-y-3">
-            {[...Array(3)].map((_, i) => (
-              <div key={i} className="rounded-lg border border-zinc-200 dark:border-zinc-700 p-4">
-                <div className="flex items-center gap-3">
-                  <div className="flex-1 space-y-2">
-                    <div className="h-4 bg-zinc-200 dark:bg-zinc-700 rounded animate-pulse w-3/4" />
-                    <div className="h-3 bg-zinc-100 dark:bg-zinc-800 rounded animate-pulse w-1/3" />
+        ) : (
+          <>
+            {/* Overdue tasks (today view only): project subtasks and ad-hoc tasks from past days */}
+            {isServerFiltered && filters.date.type === 'today' && overdueTasks.length > 0 && (() => {
+              const enriched = overdueTasks.map(t => {
+                const p = pillars.find(pl => pl.id === t.pillarId);
+                return { ...t, _pillarColor: p?.color || '#6B7280', _pillarEmoji: p?.emoji || '📋', _pillarName: p?.name || 'No Pillar' } as EnrichedTask;
+              });
+              return (
+                <TaskSectionAccordion storageKey="overdueAccordionOpen" label="Overdue" count={enriched.length} color="text-red-500 dark:text-red-400">
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '0.5rem' }}>
+                    {enriched.map(t => (
+                      <TaskItem key={t.id} task={t} showDate={t.startDate ? formatDate(t.startDate, dateFormat) : undefined} {...taskItemProps} />
+                    ))}
                   </div>
-                  <div className="w-7 h-7 bg-zinc-200 dark:bg-zinc-700 rounded-md animate-pulse" />
-                </div>
+                </TaskSectionAccordion>
+              );
+            })()}
+            {refreshing && filteredTasks.length === 0 ? (
+              <div className="space-y-3">
+                {[...Array(3)].map((_, i) => (
+                  <div key={i} className="rounded-lg border border-zinc-200 dark:border-zinc-700 p-4">
+                    <div className="flex items-center gap-3">
+                      <div className="flex-1 space-y-2">
+                        <div className="h-4 bg-zinc-200 dark:bg-zinc-700 rounded animate-pulse w-3/4" />
+                        <div className="h-3 bg-zinc-100 dark:bg-zinc-800 rounded animate-pulse w-1/3" />
+                      </div>
+                      <div className="w-7 h-7 bg-zinc-200 dark:bg-zinc-700 rounded-md animate-pulse" />
+                    </div>
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
-        ) : renderTaskList()}
+            ) : renderTaskList()}
+          </>
+        )}
         {/* No-date tasks accordion (today view only) */}
         {isServerFiltered && filters.date.type === 'today' && noDateTasks.length > 0 && (
           <NoDateAccordion

@@ -228,6 +228,18 @@ export function useTasksPage() {
     }
     return [];
   });
+  const [overdueTasks, setOverdueTasks] = useState<Task[]>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const cached = localStorage.getItem('tasks-cache');
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          if (parsed.date === getTodayString()) return parsed.overdueTasks || [];
+        }
+      } catch { /* ignore */ }
+    }
+    return [];
+  });
   const [pastDays, setPastDays] = useState<PastDay[]>([]);
   const [filters, setFilters] = useState<TaskFilters>(() => {
     if (typeof window !== 'undefined') {
@@ -447,12 +459,13 @@ export function useTasksPage() {
     }
   };
 
-  const saveTasksCache = (cacheGroups: TaskGroup[], cacheNoDateTasks: Task[], cacheScore: ScoreSummary | null) => {
+  const saveTasksCache = (cacheGroups: TaskGroup[], cacheNoDateTasks: Task[], cacheScore: ScoreSummary | null, cacheOverdueTasks: Task[] = []) => {
     try {
       localStorage.setItem('tasks-cache', JSON.stringify({
         date: today,
         groups: cacheGroups,
         noDateTasks: cacheNoDateTasks,
+        overdueTasks: cacheOverdueTasks,
         scoreSummary: cacheScore,
       }));
     } catch { /* ignore quota errors */ }
@@ -518,17 +531,21 @@ export function useTasksPage() {
         const data = await res.json();
         let newGroups: TaskGroup[];
         let newNoDateTasks: Task[];
+        let newOverdueTasks: Task[];
         if (data.groups) {
           newGroups = data.groups;
           newNoDateTasks = data.noDateTasks || [];
+          newOverdueTasks = data.overdueTasks || [];
         } else {
           newGroups = data;
           newNoDateTasks = [];
+          newOverdueTasks = [];
         }
         setGroups(newGroups);
         setNoDateTasks(newNoDateTasks);
+        setOverdueTasks(newOverdueTasks);
         if (date === today) {
-          saveTasksCache(newGroups, newNoDateTasks, scoreSummary);
+          saveTasksCache(newGroups, newNoDateTasks, scoreSummary, newOverdueTasks);
         }
       }
       lastFetchAtRef.current = Date.now();
@@ -1034,6 +1051,7 @@ export function useTasksPage() {
     loading,
     refreshing,
     noDateTasks: filteredNoDateTasks,
+    overdueTasks,
     searchQuery,
     setSearchQuery,
     pastDays,

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAuthenticatedUserId, errorResponse } from "@/lib/api-utils";
-import { db, tasks, taskSchedules, pillars } from "@/lib/db";
-import { eq, and, asc, isNull } from "drizzle-orm";
+import { db, tasks, taskSchedules, pillars, goals } from "@/lib/db";
+import { eq, and, asc, isNull, or, inArray, sql } from "drizzle-orm";
 import { ensureUpcomingTasks, ensureTasksForDate, invalidateTaskCache, recalcTargetGoalTasks } from "@/lib/ensure-upcoming-tasks";
 import { getTodayString } from "@/lib/format";
 import { createAutoLog } from "@/lib/auto-log";
@@ -165,8 +165,9 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // For today view, also include uncompleted no-date adhoc tasks
+    // For today view, also include uncompleted no-date adhoc tasks and overdue tasks
     let noDateTasks: typeof tasksWithCompletion = [];
+    let overdueTasks: typeof tasksWithCompletion = [];
     if (isToday) {
       const noDateRaw = await db
         .select()
@@ -197,9 +198,53 @@ export async function GET(request: NextRequest) {
           timerStartedAt: t.timerStartedAt,
         },
       }));
+
+      // Fetch project goal IDs so we can surface their overdue subtasks
+      const projectGoalRows = await db
+        .select({ id: goals.id })
+        .from(goals)
+        .where(and(eq(goals.userId, userId), eq(goals.goalType, 'project')));
+      const projectGoalIds = projectGoalRows.map(g => g.id);
+
+      // Overdue = past-dated, not completed/skipped/dismissed, and either
+      // a pure ad-hoc task or a project subtask
+      const overdueCondition = or(
+        and(isNull(tasks.scheduleId), isNull(tasks.goalId)),
+        projectGoalIds.length > 0 ? inArray(tasks.goalId, projectGoalIds) : sql`false`,
+      );
+      const overdueRaw = await db
+        .select()
+        .from(tasks)
+        .where(and(
+          eq(tasks.userId, userId),
+          eq(tasks.completed, false),
+          eq(tasks.skipped, false),
+          eq(tasks.dismissed, false),
+          sql`${tasks.date} != '' AND ${tasks.date} < ${dateStr}`,
+          overdueCondition,
+        ))
+        .orderBy(asc(tasks.date), asc(tasks.pillarId));
+
+      overdueTasks = overdueRaw.map(t => ({
+        ...t,
+        frequency: 'adhoc' as const,
+        customDays: null,
+        repeatInterval: null,
+        startDate: t.date,
+        completion: {
+          id: t.id,
+          taskId: t.id,
+          completed: t.completed,
+          value: t.value,
+          pointsEarned: t.pointsEarned,
+          isHighlighted: t.isHighlighted,
+          skipped: t.skipped,
+          timerStartedAt: t.timerStartedAt,
+        },
+      }));
     }
 
-    return NextResponse.json({ groups: grouped, noDateTasks });
+    return NextResponse.json({ groups: grouped, noDateTasks, overdueTasks });
   } catch (error) {
     return errorResponse(error);
   }

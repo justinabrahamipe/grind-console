@@ -41,8 +41,11 @@ export async function ensureUpcomingTasks(userId: string) {
 
 async function _ensureUpcomingTasksInner(userId: string, todayStr: string) {
 
-  // Auto-skip past incomplete tasks (date has passed, not completed/skipped/dismissed)
-  // Exclude no-date tasks (empty string date)
+  // Auto-skip past incomplete tasks, but only for recurring schedules and
+  // habitual/target/outcome goals. Project subtasks and pure ad-hoc tasks are
+  // never auto-skipped — they surface as "Overdue" instead.
+
+  // 1. Skip tasks generated from a recurring schedule (scheduleId IS NOT NULL)
   await db.update(tasks)
     .set({ skipped: true })
     .where(and(
@@ -51,7 +54,31 @@ async function _ensureUpcomingTasksInner(userId: string, todayStr: string) {
       eq(tasks.skipped, false),
       eq(tasks.dismissed, false),
       sql`${tasks.date} != '' AND ${tasks.date} < ${todayStr}`,
+      sql`${tasks.scheduleId} IS NOT NULL`,
     ));
+
+  // 2. Skip goal-linked tasks for habitual / target / outcome goals only
+  const repeatGoalRows = await db
+    .select({ id: goals.id })
+    .from(goals)
+    .where(and(
+      eq(goals.userId, userId),
+      inArray(goals.goalType, ['habitual', 'target', 'outcome']),
+    ));
+  const repeatGoalIds = repeatGoalRows.map(g => g.id);
+  if (repeatGoalIds.length > 0) {
+    await db.update(tasks)
+      .set({ skipped: true })
+      .where(and(
+        eq(tasks.userId, userId),
+        eq(tasks.completed, false),
+        eq(tasks.skipped, false),
+        eq(tasks.dismissed, false),
+        sql`${tasks.date} != '' AND ${tasks.date} < ${todayStr}`,
+        sql`${tasks.scheduleId} IS NULL`,
+        inArray(tasks.goalId, repeatGoalIds),
+      ));
+  }
 
   // Clear highlights on no-date tasks (starring is a daily feature)
   await db.update(tasks)
