@@ -17,12 +17,11 @@ export type TasksStackParamList = {
 
 export type MoreStackParamList = {
   MoreMenu: undefined;
-  Settings: undefined;
+  Dashboard: undefined;
 };
 
 export type RootTabParamList = {
   Tasks: undefined;
-  Dashboard: undefined;
   Log: undefined;
   More: undefined;
 };

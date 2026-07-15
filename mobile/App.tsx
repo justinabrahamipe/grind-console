@@ -19,7 +19,6 @@ import GoalsListScreen from "./src/screens/goals/GoalsListScreen";
 import LoginScreen from "./src/screens/LoginScreen";
 import LogScreen from "./src/screens/LogScreen";
 import MoreScreen from "./src/screens/MoreScreen";
-import SettingsScreen from "./src/screens/SettingsScreen";
 import TaskFormScreen from "./src/screens/TaskFormScreen";
 import TasksScreen from "./src/screens/TasksScreen";
 
@@ -31,7 +30,6 @@ const MoreStack = createNativeStackNavigator<MoreStackParamList & { GoalsStack: 
 
 const TAB_ICONS: Record<string, string> = {
   Tasks: "📋",
-  Dashboard: "📊",
   Log: "📝",
   More: "•••",
 };
@@ -71,7 +69,7 @@ function MoreStackNavigator() {
       <MoreStack.Screen name="MoreMenu" component={MoreScreen} options={{ headerShown: false }} />
       <MoreStack.Screen name="GoalsStack" component={GoalsStackNavigator} options={{ headerShown: false, title: "Goals" }} />
       <MoreStack.Screen name="CyclesStack" component={CyclesStackNavigator} options={{ headerShown: false, title: "Cycles" }} />
-      <MoreStack.Screen name="Settings" component={SettingsScreen} options={{ headerShown: false }} />
+      <MoreStack.Screen name="Dashboard" component={DashboardScreen} options={{ headerShown: true, title: "Dashboard" }} />
     </MoreStack.Navigator>
   );
 }
@@ -89,7 +87,6 @@ function AppTabs() {
       })}
     >
       <Tab.Screen name="Tasks" component={TasksStackNavigator} />
-      <Tab.Screen name="Dashboard" component={DashboardScreen} />
       <Tab.Screen name="Log" component={LogScreen} />
       <Tab.Screen name="More" component={MoreStackNavigator} />
     </Tab.Navigator>

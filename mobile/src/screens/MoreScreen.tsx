@@ -1,21 +1,30 @@
 import { Ionicons } from "@expo/vector-icons";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import React from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useAuth } from "../context/AuthContext";
 import { useAppTheme } from "../hooks/useAppTheme";
 import { MoreStackParamList } from "../navigation/types";
 
 type Props = NativeStackScreenProps<MoreStackParamList, "MoreMenu">;
 
 const ITEMS: { key: string; label: string; icon: keyof typeof Ionicons.glyphMap; target: string }[] = [
+  { key: "dashboard", label: "Dashboard", icon: "stats-chart-outline", target: "Dashboard" },
   { key: "goals", label: "Goals", icon: "flag-outline", target: "GoalsStack" },
   { key: "cycles", label: "Cycles", icon: "sync-outline", target: "CyclesStack" },
-  { key: "settings", label: "Settings", icon: "settings-outline", target: "Settings" },
 ];
 
 export default function MoreScreen({ navigation }: Props) {
   const theme = useAppTheme();
+  const { logout } = useAuth();
+
+  const confirmLogout = () => {
+    Alert.alert("Sign out", "You'll need to sign in again.", [
+      { text: "Cancel", style: "cancel" },
+      { text: "Sign out", style: "destructive", onPress: logout },
+    ]);
+  };
 
   return (
     <SafeAreaView style={[styles.flex, { backgroundColor: theme.bg }]} edges={["top"]}>
@@ -36,6 +45,10 @@ export default function MoreScreen({ navigation }: Props) {
           </Pressable>
         ))}
       </View>
+
+      <Pressable style={[styles.signOutButton, { borderColor: theme.danger }]} onPress={confirmLogout}>
+        <Text style={[styles.signOutText, { color: theme.danger }]}>Sign out</Text>
+      </Pressable>
     </SafeAreaView>
   );
 }
@@ -48,4 +61,14 @@ const styles = StyleSheet.create({
   row: { flexDirection: "row", alignItems: "center", paddingVertical: 14, paddingHorizontal: 16, gap: 12 },
   icon: { width: 22 },
   label: { flex: 1, fontSize: 15, fontWeight: "500" },
+  signOutButton: {
+    marginTop: "auto",
+    marginHorizontal: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingVertical: 12,
+    alignItems: "center",
+  },
+  signOutText: { fontSize: 15, fontWeight: "600" },
 });

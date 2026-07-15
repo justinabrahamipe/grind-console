@@ -1,5 +1,5 @@
 import * as Location from "expo-location";
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -18,20 +18,38 @@ import { LocationLog } from "../api/types";
 import { useAppTheme } from "../hooks/useAppTheme";
 import { todayString } from "../utils/date";
 
+const PAGE_SIZE = 30;
+
+type Row = { kind: "separator"; key: string; date: string } | { kind: "entry"; key: string; log: LocationLog };
+
+function buildRows(items: LocationLog[]): Row[] {
+  const rows: Row[] = [];
+  for (let i = 0; i < items.length; i++) {
+    rows.push({ kind: "entry", key: `log-${items[i].id}`, log: items[i] });
+    const isOldestOfDay = i === items.length - 1 || items[i + 1].date !== items[i].date;
+    if (isOldestOfDay) {
+      rows.push({ kind: "separator", key: `sep-${items[i].date}`, date: items[i].date });
+    }
+  }
+  return rows;
+}
+
 export default function LogScreen() {
   const theme = useAppTheme();
   const [notes, setNotes] = useState("");
   const [attachLocation, setAttachLocation] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [logs, setLogs] = useState<LocationLog[]>([]);
+  const [allLogs, setAllLogs] = useState<LocationLog[]>([]);
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   const [loadingLogs, setLoadingLogs] = useState(true);
 
   const loadLogs = useCallback(async () => {
     setLoadingLogs(true);
     try {
       const res = await api.get<LocationLog[]>("/api/locations?sort=desc");
-      setLogs(res.slice(0, 30));
+      setAllLogs(res);
+      setVisibleCount(PAGE_SIZE);
     } catch {
       // non-fatal: leave the list empty rather than blocking note entry
     } finally {
@@ -42,6 +60,12 @@ export default function LogScreen() {
   useEffect(() => {
     loadLogs();
   }, [loadLogs]);
+
+  const rows = useMemo(() => buildRows(allLogs.slice(0, visibleCount)), [allLogs, visibleCount]);
+
+  const loadMore = () => {
+    setVisibleCount((c) => Math.min(c + PAGE_SIZE, allLogs.length));
+  };
 
   const handleSubmit = async () => {
     if (!notes.trim()) return;
@@ -72,7 +96,7 @@ export default function LogScreen() {
 
   return (
     <SafeAreaView style={[styles.flex, { backgroundColor: theme.bg }]} edges={["top"]}>
-      <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === "ios" ? "padding" : undefined} keyboardVerticalOffset={Platform.OS === "ios" ? 90 : 0}>
+      <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === "ios" ? "padding" : "height"}>
         <View style={styles.header}>
           <Text style={[styles.title, { color: theme.text }]}>Log</Text>
         </View>
@@ -80,18 +104,27 @@ export default function LogScreen() {
         <FlatList
           style={styles.flex}
           contentContainerStyle={styles.listContent}
-          data={logs}
-          keyExtractor={(item) => String(item.id)}
+          data={rows}
+          inverted
+          keyExtractor={(row) => row.key}
           refreshing={loadingLogs}
           onRefresh={loadLogs}
-          renderItem={({ item }) => (
-            <View style={[styles.logRow, { borderColor: theme.border }]}>
-              <Text style={[styles.logDate, { color: theme.subtext }]}>
-                {item.date}{item.time ? ` · ${item.time}` : ""}
-              </Text>
-              <Text style={[styles.logNotes, { color: theme.text }]}>{item.notes}</Text>
-            </View>
-          )}
+          onEndReached={loadMore}
+          onEndReachedThreshold={0.3}
+          renderItem={({ item }) =>
+            item.kind === "separator" ? (
+              <View style={styles.dayDivider}>
+                <View style={[styles.dayDividerLine, { backgroundColor: theme.border }]} />
+                <Text style={[styles.dayDividerText, { color: theme.subtext }]}>{item.date}</Text>
+                <View style={[styles.dayDividerLine, { backgroundColor: theme.border }]} />
+              </View>
+            ) : (
+              <View style={[styles.logRow, { borderColor: theme.border }]}>
+                {item.log.time && <Text style={[styles.logDate, { color: theme.subtext }]}>{item.log.time}</Text>}
+                <Text style={[styles.logNotes, { color: theme.text }]}>{item.log.notes}</Text>
+              </View>
+            )
+          }
           ListEmptyComponent={
             !loadingLogs ? <Text style={[styles.empty, { color: theme.subtext }]}>No notes yet.</Text> : null
           }
@@ -139,9 +172,12 @@ const styles = StyleSheet.create({
   saveButton: { borderRadius: 8, paddingHorizontal: 18, paddingVertical: 8 },
   saveButtonText: { color: "#fff", fontWeight: "600" },
   error: { marginHorizontal: 16, marginBottom: 8, fontSize: 13 },
-  listContent: { paddingHorizontal: 16, paddingBottom: 40 },
+  listContent: { paddingHorizontal: 16, paddingVertical: 12 },
+  dayDivider: { flexDirection: "row", alignItems: "center", gap: 10, marginVertical: 12 },
+  dayDividerLine: { flex: 1, height: StyleSheet.hairlineWidth },
+  dayDividerText: { fontSize: 11, fontWeight: "700", textTransform: "uppercase", letterSpacing: 0.5 },
   logRow: { paddingVertical: 10, borderBottomWidth: StyleSheet.hairlineWidth },
   logDate: { fontSize: 12, marginBottom: 2 },
   logNotes: { fontSize: 14 },
-  empty: { textAlign: "center", marginTop: 40, fontSize: 14 },
+  empty: { textAlign: "center", marginTop: 40, fontSize: 14, transform: [{ scaleY: -1 }] },
 });
