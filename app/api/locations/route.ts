@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getAuthenticatedUserId, errorResponse } from "@/lib/api-utils";
 import { db, locationLogs } from "@/lib/db";
 import { eq, and, desc, asc, like, gte, lte } from "drizzle-orm";
+import { getTodayString } from "@/lib/format";
 
 export async function GET(request: NextRequest) {
   try {
@@ -35,11 +36,7 @@ export async function POST(request: Request) {
   try {
     const userId = await getAuthenticatedUserId();
     const body = await request.json();
-    const { latitude, longitude, date, time, notes } = body;
-
-    if (latitude == null || longitude == null || !date) {
-      return NextResponse.json({ error: "latitude, longitude, and date are required" }, { status: 400 });
-    }
+    const { latitude = 0, longitude = 0, date = getTodayString(), time, notes } = body;
 
     if (latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180) {
       return NextResponse.json({ error: "Invalid coordinates" }, { status: 400 });

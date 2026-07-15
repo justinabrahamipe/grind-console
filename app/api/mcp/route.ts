@@ -1,8 +1,6 @@
 import { NextRequest } from "next/server";
-import { db, userPreferences } from "@/lib/db";
-import { eq } from "drizzle-orm";
-import cryptoNode from "crypto";
 import { rateLimit } from "@/lib/rate-limit";
+import { resolveUserIdFromApiKey } from "@/lib/api-key-auth";
 import { handleGetTasks, handleGetGoals, handleGetScores, handleGetLogs, handleGetPillars, handleGetSummary, handleGetCycles, handleGetFeedback, handleGetTaskDetails } from "./handlers/read-handlers";
 import { handleCompleteTask, handleCreateTask, handleEditTask, handleDeleteTask } from "./handlers/task-handlers";
 import { handleCreateGoal, handleEditGoal } from "./handlers/goal-handlers";
@@ -207,10 +205,6 @@ const TOOLS = [
   },
 ];
 
-function hashKey(key: string): string {
-  return cryptoNode.createHash("sha256").update(key).digest("hex");
-}
-
 async function authenticate(request: NextRequest): Promise<string | null> {
   // Support Bearer token from Authorization header (used by custom connectors)
   const authHeader = request.headers.get("authorization");
@@ -220,27 +214,7 @@ async function authenticate(request: NextRequest): Promise<string | null> {
   const key = bearerKey || request.nextUrl.searchParams.get("key");
   if (!key) return null;
 
-  // Try hashed lookup first, then fall back to plaintext for unmigrated keys
-  const hashed = hashKey(key);
-  const [byHash] = await db
-    .select({ userId: userPreferences.userId })
-    .from(userPreferences)
-    .where(eq(userPreferences.apiKeyHash, hashed));
-  if (byHash?.userId) return byHash.userId;
-
-  const [byPlain] = await db
-    .select({ userId: userPreferences.userId })
-    .from(userPreferences)
-    .where(eq(userPreferences.apiKey, key));
-  if (byPlain?.userId) {
-    // Migrate: store hash and clear plaintext
-    await db.update(userPreferences)
-      .set({ apiKeyHash: hashed, apiKey: null })
-      .where(eq(userPreferences.userId, byPlain.userId));
-    return byPlain.userId;
-  }
-
-  return null;
+  return resolveUserIdFromApiKey(key);
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any

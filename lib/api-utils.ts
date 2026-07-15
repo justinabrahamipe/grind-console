@@ -1,7 +1,17 @@
 import { NextResponse } from "next/server";
+import { headers } from "next/headers";
 import { auth } from "@/auth";
+import { resolveUserIdFromApiKey } from "@/lib/api-key-auth";
 
 export async function getAuthenticatedUserId(): Promise<string> {
+  // Bearer API key (used by the mobile app and other API clients) takes priority over the web session.
+  const authHeader = (await headers()).get("authorization");
+  const bearerKey = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : null;
+  if (bearerKey) {
+    const userId = await resolveUserIdFromApiKey(bearerKey);
+    if (userId) return userId;
+  }
+
   const session = await auth();
   if (!session?.user?.id) {
     throw new ApiError("Unauthorized", 401);
