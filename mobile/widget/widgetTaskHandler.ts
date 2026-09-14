@@ -84,8 +84,14 @@ async function refreshTodayData(): Promise<TodayResponse | null> {
   return taskCache.getForDate(date);
 }
 
-async function renderTaskWidget(justCompletedId?: number): Promise<{ light: React.JSX.Element; dark: React.JSX.Element }> {
-  const data = await refreshTodayData();
+// fromCacheOnly: skip the network hop in refreshTodayData and draw whatever's cached.
+// Used for resizes, where the data hasn't changed but the bitmap has to be redrawn at
+// the new size *fast* — see the WIDGET_RESIZED branch below.
+async function renderTaskWidget(
+  justCompletedId?: number,
+  fromCacheOnly = false
+): Promise<{ light: React.JSX.Element; dark: React.JSX.Element }> {
+  const data = fromCacheOnly ? await taskCache.getForDate(todayString()) : await refreshTodayData();
   const { overdue, today } = pendingTasks(data, justCompletedId);
   const todayPct = todayCompletionPct(data);
   return {
@@ -106,6 +112,16 @@ function renderLogWidget(): { light: React.JSX.Element; dark: React.JSX.Element 
 export const widgetTaskHandler: WidgetTaskHandler = async ({ widgetInfo, widgetAction, clickAction, clickActionData, renderWidget }) => {
   if (widgetInfo.widgetName === "LogWidget") {
     renderWidget(renderLogWidget());
+    return;
+  }
+
+  // The widget is drawn to a bitmap that the launcher blits at its natural size, top
+  // left, without scaling (rn_widget.xml, scaleType="matrix"). Mid-resize the frame has
+  // already grown but the bitmap hasn't been redrawn yet, so the uncovered strip shows
+  // the flat card colour painted on the root by plugins/withWidgetSurface.js until this
+  // render lands. Going through the cache instead of the network keeps that to a blink.
+  if (widgetAction === "WIDGET_RESIZED") {
+    renderWidget(await renderTaskWidget(undefined, true));
     return;
   }
 
