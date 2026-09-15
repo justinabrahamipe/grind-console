@@ -2,18 +2,27 @@ const { withDangerousMod } = require("expo/config-plugins");
 const fs = require("fs");
 const path = require("path");
 
-// react-native-android-widget draws the widget to a PNG and shows it in an ImageView
-// with scaleType="matrix" — the bitmap is blitted 1:1 at the top-left and is never
-// scaled. Its size comes from the launcher's reported cell size at the time of the
-// last render, so while a resize drag is in flight (and on launchers that under-report
-// the cell size) the bitmap is smaller than the view, and the root FrameLayout that
-// shows through is transparent — the card looks like it only fills part of the frame.
+// react-native-android-widget draws the widget to a PNG in a hidden JS surface and
+// shows it in a plain ImageView — there's no live native layout the OS can reflow as
+// you drag. The bitmap reflects the launcher's cell size as of the last completed
+// render, so while a resize is in flight the frame has already grown but the bitmap
+// hasn't been redrawn yet.
+//
+// The library's default scaleType="matrix" blits that stale bitmap 1:1 at the
+// top-left, so the uncovered remainder of the frame shows the root FrameLayout's own
+// background with no widget content in it at all. We use scaleType="fitXY" instead,
+// which stretches the same stale bitmap to fill the whole frame — a blurry-but-complete
+// preview instead of a content-free gap. Once the fresh, correctly-sized bitmap lands
+// the view size matches the bitmap size again, so fitXY and matrix render identically —
+// this only changes what's visible during the brief window mid-resize.
+//
+// The background colour below is the fallback for the sliver of time before the very
+// first bitmap has rendered at all (e.g. right after the widget is added).
 //
 // App-module resources win over library-module resources of the same name, so these
-// files replace the library's rn_widget.xml with an identical layout that paints the
-// root in the widget's own card colour. Any uncovered area then reads as the card
-// instead of a hole. Keep the ids in sync with the library layout — RNWidget.java
-// looks them up by name.
+// files replace the library's rn_widget.xml with an identical layout plus the surface
+// colour and scaleType change. Keep the ids in sync with the library layout —
+// RNWidget.java looks them up by name.
 const SURFACE = { light: "#F8F6F1", dark: "#1E1B17" }; // theme.card, mobile/src/theme.ts
 const CORNER_RADIUS_DP = 20; // matches the root FlexWidget borderRadius in the widgets
 
@@ -37,7 +46,7 @@ const widgetLayout = (night) => `<?xml version="1.0" encoding="utf-8"?>
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:background="@android:color/transparent"
-        android:scaleType="matrix"
+        android:scaleType="fitXY"
         android:visibility="${night ? "gone" : "visible"}" />
 
     <ImageView
@@ -45,7 +54,7 @@ const widgetLayout = (night) => `<?xml version="1.0" encoding="utf-8"?>
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:background="@android:color/transparent"
-        android:scaleType="matrix"
+        android:scaleType="fitXY"
         android:visibility="${night ? "visible" : "gone"}" />
 
     <FrameLayout
